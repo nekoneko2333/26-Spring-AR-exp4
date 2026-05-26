@@ -1,0 +1,64 @@
+# Unity generated folders
+/Library/
+/Temp/
+/Obj/
+/Build/
+/Builds/
+/Logs/
+/UserSettings/
+/MemoryCaptures/
+/Recordings/
+
+# Unity cache and local generated files
+/.vs/
+/.vscode/
+/.idea/
+/.consulo/
+/.gradle/
+/ExportedObj/
+/sysinfo.txt
+
+# Unity crash/error reports
+/CrashlyticsSettings.asset
+/debug.log
+
+# Visual Studio / Rider / MonoDevelop
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+*.app
+*.exe
+*.msi
+*.dmg
+/*.zip
+
+# Large DCC source files. Keep exported FBX/GLB/textures in Git instead.
+*.blend
+*.blend1
+
+# Package manager local cache
+/Packages/packages-lock.json.bak
+
+# Auto-generated lighting data can be large; commit manually only if needed.
+*_LightingData.asset
