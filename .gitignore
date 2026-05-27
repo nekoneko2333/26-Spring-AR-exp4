@@ -4,6 +4,9 @@
 /Obj/
 /Build/
 /Builds/
+/BuildsWin/
+/BuildsMac/
+/BuildsLinux/
 /Logs/
 /UserSettings/
 /MemoryCaptures/
