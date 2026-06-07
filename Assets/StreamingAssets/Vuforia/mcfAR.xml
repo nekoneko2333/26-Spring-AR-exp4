@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <QCARConfig>
   <Tracking>
+    <ImageTarget name="cover" size="30.000000 40.000000" />
+    <ImageTarget name="chapter5" size="30.000000 21.227364" />
+    <ImageTarget name="chapter4" size="30.000000 21.227364" />
+    <ImageTarget name="chapter3" size="30.000000 21.227364" />
+    <ImageTarget name="chapter2" size="30.000000 21.227364" />
+    <ImageTarget name="chapter1" size="30.000000 21.227364" />
     <ImageTarget name="Giovanni_Sygna_10" size="25.000000 25.000000" />
     <ImageTarget name="Zinnia_Regular_00" size="25.000000 25.000000" />
     <ImageTarget name="LillieAnniversary_50" size="25.000000 25.000000" />

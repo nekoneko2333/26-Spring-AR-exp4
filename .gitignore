@@ -65,4 +65,4 @@ Desktop.ini
 
 # Auto-generated lighting data can be large; commit manually only if needed.
 *_LightingData.asset
-"Packages/com.ptc.vuforia.engine-*.tgz" 
+/Packages/com.ptc.vuforia.engine-*.tgz
