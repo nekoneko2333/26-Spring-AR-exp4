@@ -2,8 +2,18 @@ using UnityEngine;
 
 public class ARBookCollectionManager : MonoBehaviour
 {
+    public bool clearOnStartForDebug;
+
     private const string CaptureKeyPrefix = "Captured_";
     private const string CapturedIdsKey = "CapturedIds";
+
+    private void Start()
+    {
+        if (clearOnStartForDebug)
+        {
+            ClearCollection();
+        }
+    }
 
     public void CaptureCreature(string captureId)
     {

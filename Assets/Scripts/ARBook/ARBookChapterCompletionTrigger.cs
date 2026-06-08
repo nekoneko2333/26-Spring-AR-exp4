@@ -7,6 +7,8 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
     public string completeDialogue = "Chapter 1 is complete. Open Chapter 2.";
     public ARBookCollectionManager collectionManager;
     public ARBookChapterProgress chapterProgress;
+    public GameObject transitionEffectRoot;
+    public ParticleSystem transitionEffect;
     public bool onlyCompleteOnce = true;
 
     private void Start()
@@ -46,6 +48,29 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
             return;
         }
 
+        PlayTransitionEffect();
         chapterProgress.CompleteChapterWithMemoryFragment(chapterId, completeDialogue);
+    }
+
+    private void PlayTransitionEffect()
+    {
+        if (transitionEffectRoot != null)
+        {
+            transitionEffectRoot.SetActive(true);
+
+            ParticleSystem[] particleSystems = transitionEffectRoot.GetComponentsInChildren<ParticleSystem>();
+            for (int i = 0; i < particleSystems.Length; i++)
+            {
+                particleSystems[i].Play();
+            }
+
+            return;
+        }
+
+        if (transitionEffect != null)
+        {
+            transitionEffect.gameObject.SetActive(true);
+            transitionEffect.Play();
+        }
     }
 }

@@ -133,7 +133,8 @@ public class ARBookInteractable : MonoBehaviour
             return null;
         }
 
-        ARBookMapNode[] nodes = FindObjectsOfType<ARBookMapNode>();
+        ARBookMapNode[] nodes = FindNodesInSameChapterRoot();
+
         for (int i = 0; i < nodes.Length; i++)
         {
             if (nodes[i].nodeIndex == interactionNodeIndex)
@@ -144,5 +145,25 @@ public class ARBookInteractable : MonoBehaviour
         }
 
         return null;
+    }
+
+    private ARBookMapNode[] FindNodesInSameChapterRoot()
+    {
+        Transform parent = transform;
+        while (parent != null)
+        {
+            if (parent.GetComponentInChildren<ARBookPlayerMover>(true) != null)
+            {
+                ARBookMapNode[] nodes = parent.GetComponentsInChildren<ARBookMapNode>(true);
+                if (nodes.Length > 0)
+                {
+                    return nodes;
+                }
+            }
+
+            parent = parent.parent;
+        }
+
+        return FindObjectsOfType<ARBookMapNode>();
     }
 }

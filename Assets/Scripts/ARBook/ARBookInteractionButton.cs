@@ -11,6 +11,7 @@ public class ARBookInteractionButton : MonoBehaviour
     public string promptFormat = "Interact: {0}";
     public bool hideButtonWhenNoTarget = true;
     public ARBookCaptureController captureController;
+    public bool useActivePlayerMover = true;
 
     private ARBookInteractable currentInteractable;
 
@@ -57,6 +58,7 @@ public class ARBookInteractionButton : MonoBehaviour
 
     private void RefreshCurrentTarget()
     {
+        ResolvePlayerMover();
         currentInteractable = FindBestInteractable();
         bool hasTarget = currentInteractable != null;
 
@@ -81,29 +83,99 @@ public class ARBookInteractionButton : MonoBehaviour
     private ARBookInteractable FindBestInteractable()
     {
         ARBookInteractable[] interactables = FindObjectsOfType<ARBookInteractable>(true);
+        ARBookPlayerMover[] movers = GetCandidatePlayerMovers();
         ARBookInteractable bestInteractable = null;
+        ARBookPlayerMover bestMover = null;
         float bestDistance = float.MaxValue;
 
         for (int i = 0; i < interactables.Length; i++)
         {
             ARBookInteractable interactable = interactables[i];
-            if (interactable == null || !interactable.CanInteract(playerMover))
+            if (interactable == null)
             {
                 continue;
             }
 
-            float distance = playerMover != null
-                ? Vector3.Distance(playerMover.transform.position, interactable.transform.position)
-                : 0f;
-
-            if (distance < bestDistance)
+            for (int j = 0; j < movers.Length; j++)
             {
-                bestDistance = distance;
-                bestInteractable = interactable;
+                ARBookPlayerMover mover = movers[j];
+                if (mover == null || !interactable.CanInteract(mover))
+                {
+                    continue;
+                }
+
+                float distance = Vector3.Distance(mover.transform.position, interactable.transform.position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestInteractable = interactable;
+                    bestMover = mover;
+                }
             }
         }
 
+        if (bestMover != null)
+        {
+            playerMover = bestMover;
+        }
+
         return bestInteractable;
+    }
+
+    private void ResolvePlayerMover()
+    {
+        if (!useActivePlayerMover && playerMover != null)
+        {
+            return;
+        }
+
+        if (playerMover != null && playerMover.gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        ARBookPlayerMover[] movers = FindObjectsOfType<ARBookPlayerMover>(true);
+        for (int i = 0; i < movers.Length; i++)
+        {
+            if (movers[i] != null && movers[i].gameObject.activeInHierarchy && movers[i].enabled)
+            {
+                playerMover = movers[i];
+                return;
+            }
+        }
+    }
+
+    private ARBookPlayerMover[] GetCandidatePlayerMovers()
+    {
+        if (!useActivePlayerMover && playerMover != null)
+        {
+            return new[] { playerMover };
+        }
+
+        ARBookPlayerMover[] allMovers = FindObjectsOfType<ARBookPlayerMover>(true);
+        int activeCount = 0;
+
+        for (int i = 0; i < allMovers.Length; i++)
+        {
+            if (allMovers[i] != null && allMovers[i].gameObject.activeInHierarchy && allMovers[i].enabled)
+            {
+                activeCount++;
+            }
+        }
+
+        ARBookPlayerMover[] activeMovers = new ARBookPlayerMover[activeCount];
+        int index = 0;
+
+        for (int i = 0; i < allMovers.Length; i++)
+        {
+            if (allMovers[i] != null && allMovers[i].gameObject.activeInHierarchy && allMovers[i].enabled)
+            {
+                activeMovers[index] = allMovers[i];
+                index++;
+            }
+        }
+
+        return activeMovers;
     }
 
     private void SetPrompt(string text)

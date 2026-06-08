@@ -7,8 +7,7 @@ public class ARBookMapNode : MonoBehaviour
     public string nodeName;
     public bool isUnlocked = true;
     public UnityEvent onNodeReached;
-
-    private ARBookPlayerMover playerMover;
+    public ARBookPlayerMover playerMover;
 
     public void OnTapped()
     {
@@ -19,7 +18,7 @@ public class ARBookMapNode : MonoBehaviour
 
         if (playerMover == null)
         {
-            playerMover = FindObjectOfType<ARBookPlayerMover>();
+            playerMover = FindPlayerMoverInSameRoot();
         }
 
         if (playerMover == null)
@@ -34,5 +33,22 @@ public class ARBookMapNode : MonoBehaviour
     private string GetDisplayName()
     {
         return string.IsNullOrWhiteSpace(nodeName) ? gameObject.name : nodeName;
+    }
+
+    private ARBookPlayerMover FindPlayerMoverInSameRoot()
+    {
+        Transform parent = transform.parent;
+        while (parent != null)
+        {
+            ARBookPlayerMover mover = parent.GetComponentInChildren<ARBookPlayerMover>(true);
+            if (mover != null)
+            {
+                return mover;
+            }
+
+            parent = parent.parent;
+        }
+
+        return FindObjectOfType<ARBookPlayerMover>();
     }
 }

@@ -177,7 +177,12 @@ public class ARBookPlayerMover : MonoBehaviour
             return;
         }
 
-        orderedNodes = FindObjectsOfType<ARBookMapNode>()
+        Transform searchRoot = GetMovementSpace();
+        ARBookMapNode[] nodes = searchRoot != null
+            ? searchRoot.GetComponentsInChildren<ARBookMapNode>(true)
+            : FindObjectsOfType<ARBookMapNode>();
+
+        orderedNodes = nodes
             .Where(node => node != null && node.nodeIndex > 0)
             .OrderBy(node => node.nodeIndex)
             .ToArray();
