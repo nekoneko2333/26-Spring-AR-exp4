@@ -17,7 +17,6 @@ public class ARBookPlayerMover : MonoBehaviour
     public float heightOffset;
     public GameObject visibleModel;
     public bool activateVisibleModelOnStart = true;
-    public bool logMovementDebug;
     public bool ignoreMoveRequestsWhileMoving = true;
     public bool moveDirectlyToTappedNode = true;
     public ARBookMapNode[] orderedNodes;
@@ -28,7 +27,6 @@ public class ARBookPlayerMover : MonoBehaviour
     {
         if (moveSpeed < 0.5f)
         {
-            Debug.LogWarning($"Move speed was too low on {name}. Using 2 for this play session.");
             moveSpeed = 2f;
         }
 
@@ -60,13 +58,11 @@ public class ARBookPlayerMover : MonoBehaviour
 
         if (!targetNode.isUnlocked)
         {
-            Debug.Log($"Cannot move to locked node: {targetNode.name}");
             return;
         }
 
         if (isMoving && ignoreMoveRequestsWhileMoving)
         {
-            Debug.Log($"Ignoring node tap while moving: {targetNode.name}");
             return;
         }
 
@@ -98,19 +94,12 @@ public class ARBookPlayerMover : MonoBehaviour
     {
         Transform movementSpace = GetMovementSpace();
         float fixedY = transform.localPosition.y;
-        bool loggedThisStep = false;
 
         while (true)
         {
             Vector3 currentPosition = transform.localPosition;
             Vector3 targetPosition = GetTargetLocalPosition(targetNode.transform, movementSpace);
             targetPosition.y = useNodeHeight ? targetPosition.y + heightOffset : fixedY;
-
-            if (logMovementDebug && !loggedThisStep)
-            {
-                Debug.Log($"Moving {name} local {currentPosition} -> {targetPosition} for node {targetNode.name}");
-                loggedThisStep = true;
-            }
 
             if (Vector3.Distance(currentPosition, targetPosition) <= stopDistance)
             {
@@ -174,7 +163,6 @@ public class ARBookPlayerMover : MonoBehaviour
             }
             else
             {
-                Debug.Log($"Route stopped at locked or missing node index: {i}");
                 break;
             }
         }
@@ -262,11 +250,6 @@ public class ARBookPlayerMover : MonoBehaviour
         }
 
         currentNode = nearestNode.transform;
-
-        if (logMovementDebug)
-        {
-            Debug.Log($"Nearest start node for {name}: {nearestNode.name}");
-        }
     }
 
     private ARBookMapNode FindNearestNode()

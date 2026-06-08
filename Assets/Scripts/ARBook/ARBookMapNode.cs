@@ -14,7 +14,6 @@ public class ARBookMapNode : MonoBehaviour
     {
         if (!isUnlocked)
         {
-            Debug.Log($"Map node locked: {GetDisplayName()}");
             return;
         }
 

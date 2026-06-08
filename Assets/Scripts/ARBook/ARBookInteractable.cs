@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 public class ARBookInteractable : MonoBehaviour
 {
@@ -11,6 +12,11 @@ public class ARBookInteractable : MonoBehaviour
     public int interactionNodeIndex;
     public float interactionRadius = 2f;
     public bool requirePlayerAtInteractionNode = true;
+    public bool canBeCaptured;
+    public bool isCaptured;
+    public string captureId;
+    [TextArea(2, 4)] public string captureDialogue;
+    public UnityEvent onCaptured;
 
     private int dialogueIndex;
 
@@ -54,7 +60,6 @@ public class ARBookInteractable : MonoBehaviour
             }
         }
 
-        string dialogue = GetNextDialogue();
         DialogueManager dialogueManager = DialogueManager.Instance;
         if (dialogueManager == null)
         {
@@ -67,29 +72,29 @@ public class ARBookInteractable : MonoBehaviour
             return;
         }
 
-        dialogueManager.ShowDialogue(GetDisplayName(), dialogue);
+        dialogueManager.ShowDialogueSequence(GetDisplayName(), GetDialogueSequence());
     }
 
-    private string GetNextDialogue()
+    private string[] GetDialogueSequence()
     {
         if (dialogueFragments == null || dialogueFragments.Length == 0)
         {
-            return string.Empty;
+            return new[] { string.IsNullOrWhiteSpace(captureDialogue) ? string.Empty : captureDialogue };
         }
 
-        int safeIndex = Mathf.Clamp(dialogueIndex, 0, dialogueFragments.Length - 1);
-        string dialogue = dialogueFragments[safeIndex];
+        if (!cycleDialogue)
+        {
+            return dialogueFragments;
+        }
 
+        string dialogue = dialogueFragments[Mathf.Clamp(dialogueIndex, 0, dialogueFragments.Length - 1)];
+        
         if (cycleDialogue)
         {
             dialogueIndex = (dialogueIndex + 1) % dialogueFragments.Length;
         }
-        else
-        {
-            dialogueIndex = Mathf.Min(dialogueIndex + 1, dialogueFragments.Length - 1);
-        }
 
-        return dialogue;
+        return new[] { dialogue };
     }
 
     private void FaceCamera()

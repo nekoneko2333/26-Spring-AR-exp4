@@ -6,7 +6,6 @@ public class ARTapRaycaster : MonoBehaviour
     public float raycastDistance = 100f;
     public LayerMask raycastLayers = ~0;
     public float tapCooldown = 0.15f;
-    public bool logTapDebug;
     public bool interactImmediatelyOnModelTap;
 
     private float nextTapTime;
@@ -78,11 +77,6 @@ public class ARTapRaycaster : MonoBehaviour
         ARBookMapNode node = hit.collider.GetComponentInParent<ARBookMapNode>();
         if (node != null)
         {
-            if (logTapDebug)
-            {
-                Debug.Log($"Tapped map node: {node.name}, hit collider: {hit.collider.name}");
-            }
-
             node.OnTapped();
             return;
         }
@@ -90,11 +84,6 @@ public class ARTapRaycaster : MonoBehaviour
         ARBookInteractable interactable = hit.collider.GetComponentInParent<ARBookInteractable>();
         if (interactable != null)
         {
-            if (logTapDebug)
-            {
-                Debug.Log($"Tapped interactable: {interactable.name}, hit collider: {hit.collider.name}");
-            }
-
             if (interactImmediatelyOnModelTap)
             {
                 interactable.Interact();

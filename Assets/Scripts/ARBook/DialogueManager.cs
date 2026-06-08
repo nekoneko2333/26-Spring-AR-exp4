@@ -18,6 +18,10 @@ public class DialogueManager : MonoBehaviour
 
     public Button continueButton;
 
+    private string currentSpeakerName;
+    private string[] currentDialogueLines;
+    private int currentDialogueIndex;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -32,7 +36,7 @@ public class DialogueManager : MonoBehaviour
     {
         if (continueButton != null)
         {
-            continueButton.onClick.AddListener(HideDialogue);
+            continueButton.onClick.AddListener(ContinueDialogue);
         }
         else
         {
@@ -43,6 +47,67 @@ public class DialogueManager : MonoBehaviour
     }
 
     public void ShowDialogue(string speakerName, string text)
+    {
+        ShowDialogueSequence(speakerName, new[] { text });
+    }
+
+    public void ShowDialogueSequence(string speakerName, string[] lines)
+    {
+        if (lines == null || lines.Length == 0)
+        {
+            ShowDialogueLine(speakerName, string.Empty);
+            return;
+        }
+
+        currentSpeakerName = speakerName;
+        currentDialogueLines = lines;
+        currentDialogueIndex = 0;
+
+        ShowDialogueLine(currentSpeakerName, currentDialogueLines[currentDialogueIndex]);
+    }
+
+    public void QueueDialogue(string speakerName, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        if (currentDialogueLines == null || currentDialogueLines.Length == 0 || dialoguePanel == null || !dialoguePanel.activeSelf)
+        {
+            ShowDialogue(speakerName, text);
+            return;
+        }
+
+        string[] extendedLines = new string[currentDialogueLines.Length + 1];
+        for (int i = 0; i < currentDialogueLines.Length; i++)
+        {
+            extendedLines[i] = currentDialogueLines[i];
+        }
+
+        extendedLines[extendedLines.Length - 1] = text;
+        currentDialogueLines = extendedLines;
+    }
+
+    public void ContinueDialogue()
+    {
+        if (currentDialogueLines == null || currentDialogueLines.Length == 0)
+        {
+            HideDialogue();
+            return;
+        }
+
+        currentDialogueIndex++;
+        if (currentDialogueIndex >= currentDialogueLines.Length)
+        {
+            HideDialogue();
+            return;
+        }
+
+        ShowDialogueLine(currentSpeakerName, currentDialogueLines[currentDialogueIndex]);
+    }
+
+    private void ShowDialogueLine(string speakerName, string text)
     {
         if (dialoguePanel == null)
         {
@@ -84,6 +149,8 @@ public class DialogueManager : MonoBehaviour
         if (dialoguePanel != null)
         {
             dialoguePanel.SetActive(false);
+            currentDialogueLines = null;
+            currentDialogueIndex = 0;
         }
         else
         {

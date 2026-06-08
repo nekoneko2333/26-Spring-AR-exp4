@@ -10,7 +10,7 @@ public class ARBookInteractionButton : MonoBehaviour
     public TMP_Text promptTMPText;
     public string promptFormat = "Interact: {0}";
     public bool hideButtonWhenNoTarget = true;
-    public bool logInteractionDebug;
+    public ARBookCaptureController captureController;
 
     private ARBookInteractable currentInteractable;
 
@@ -19,6 +19,11 @@ public class ARBookInteractionButton : MonoBehaviour
         if (playerMover == null)
         {
             playerMover = FindObjectOfType<ARBookPlayerMover>();
+        }
+
+        if (captureController == null)
+        {
+            captureController = FindObjectOfType<ARBookCaptureController>();
         }
 
         if (interactButton != null)
@@ -44,11 +49,6 @@ public class ARBookInteractionButton : MonoBehaviour
 
         if (currentInteractable == null)
         {
-            if (logInteractionDebug)
-            {
-                Debug.Log("No available ARBookInteractable for the interaction button.");
-            }
-
             return;
         }
 
@@ -71,6 +71,11 @@ public class ARBookInteractionButton : MonoBehaviour
         }
 
         SetPrompt(hasTarget ? string.Format(promptFormat, currentInteractable.GetDisplayName()) : string.Empty);
+
+        if (captureController != null)
+        {
+            captureController.SetCurrentTarget(hasTarget ? currentInteractable : null);
+        }
     }
 
     private ARBookInteractable FindBestInteractable()
