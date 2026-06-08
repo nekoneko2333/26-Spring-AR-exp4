@@ -60,6 +60,52 @@ Desktop.ini
 *.blend
 *.blend1
 
+# Large ML/AI model weights and local model caches
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.tflite
+*.pb
+*.h5
+*.hdf5
+*.keras
+*.caffemodel
+*.mlmodel
+*.gguf
+*.ggml
+*.bin
+*.weights
+*.engine
+*.trt
+*.plan
+*.param
+*.ncnn
+*.rknn
+*.mnn
+*.om
+*.blob
+*.model
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+/models/
+/Models/
+/Assets/models/
+/Assets/Models/
+/checkpoints/
+/Checkpoints/
+/weights/
+/Weights/
+/pretrained/
+/Pretrained/
+/Assets/StreamingAssets/models/
+/Assets/StreamingAssets/Models/
+
 # Package manager local cache
 /Packages/packages-lock.json.bak
 
