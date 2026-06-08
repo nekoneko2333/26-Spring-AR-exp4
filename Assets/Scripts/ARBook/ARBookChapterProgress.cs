@@ -40,19 +40,31 @@ public class ARBookChapterProgress : MonoBehaviour
         return PlayerPrefs.GetInt(GetMemoryFragmentKey(chapterId), 0) == 1;
     }
 
-    public void CompleteChapter01AfterPikachuCaptured()
+    public void ClearChapterProgress(int chapterId)
     {
-        SetMemoryFragmentCollected(1);
-        CompleteChapter(1);
+        PlayerPrefs.DeleteKey(GetChapterCompletedKey(chapterId));
+        PlayerPrefs.DeleteKey(GetMemoryFragmentKey(chapterId));
+        PlayerPrefs.Save();
+    }
+
+    public void CompleteChapterWithMemoryFragment(int chapterId, string completeDialogue)
+    {
+        SetMemoryFragmentCollected(chapterId);
+        CompleteChapter(chapterId);
 
         if (dialogueManager != null)
         {
-            dialogueManager.QueueDialogue("Chapter Complete", chapter01CompleteDialogue);
+            dialogueManager.ShowDialogue("Chapter Complete", completeDialogue);
         }
         else
         {
             Debug.LogWarning("ARBookChapterProgress dialogueManager is not assigned.");
         }
+    }
+
+    public void CompleteChapter01AfterPikachuCaptured()
+    {
+        CompleteChapterWithMemoryFragment(1, chapter01CompleteDialogue);
     }
 
     private string GetChapterCompletedKey(int chapterId)

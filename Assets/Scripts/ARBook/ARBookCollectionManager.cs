@@ -2,18 +2,8 @@ using UnityEngine;
 
 public class ARBookCollectionManager : MonoBehaviour
 {
-    public bool clearOnStartForDebug;
-
     private const string CaptureKeyPrefix = "Captured_";
     private const string CapturedIdsKey = "CapturedIds";
-
-    private void Start()
-    {
-        if (clearOnStartForDebug)
-        {
-            ClearCollectionForDebug();
-        }
-    }
 
     public void CaptureCreature(string captureId)
     {
@@ -38,7 +28,7 @@ public class ARBookCollectionManager : MonoBehaviour
         return PlayerPrefs.GetInt(GetCaptureKey(captureId), 0) == 1;
     }
 
-    public void ClearCollectionForDebug()
+    public void ClearCollection()
     {
         string capturedIds = PlayerPrefs.GetString(CapturedIdsKey, string.Empty);
         if (!string.IsNullOrWhiteSpace(capturedIds))

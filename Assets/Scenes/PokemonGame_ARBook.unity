@@ -11890,7 +11890,19 @@ MonoBehaviour:
   isUnlocked: 1
   onNodeReached:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1980180829}
+        m_TargetAssemblyTypeName: ARBookChapterCompletionTrigger, Assembly-CSharp
+        m_MethodName: TryCompleteChapter
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &957469160
 GameObject:
   m_ObjectHideFlags: 0
@@ -17712,19 +17724,7 @@ MonoBehaviour:
   captureDialogue: Pikachu joined your memory collection.
   onCaptured:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1980180826}
-        m_TargetAssemblyTypeName: ARBookChapterProgress, Assembly-CSharp
-        m_MethodName: CompleteChapter01AfterPikachuCaptured
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!1 &1862422937
 GameObject:
   m_ObjectHideFlags: 0
@@ -18504,6 +18504,7 @@ GameObject:
   - component: {fileID: 1980180828}
   - component: {fileID: 1980180827}
   - component: {fileID: 1980180826}
+  - component: {fileID: 1980180829}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -18622,7 +18623,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ac103fe6ee74163bbfee4f84ee78dab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  clearOnStartForDebug: 1
+--- !u!114 &1980180829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980180821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57b891ca41c14465bbefaa1ccfd58c2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chapterId: 1
+  requiredCaptureId: Pikachu
+  completeDialogue: Chapter 1 is complete. Open Chapter 2.
+  collectionManager: {fileID: 1980180828}
+  chapterProgress: {fileID: 1980180826}
+  onlyCompleteOnce: 0
 --- !u!1 &1989934922
 GameObject:
   m_ObjectHideFlags: 0
