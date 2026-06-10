@@ -11,6 +11,7 @@ public class ARBookPlayerMover : MonoBehaviour
     [FormerlySerializedAs("currentNode")] public Transform startPoint;
     public bool isMoving;
     public bool rotateToMoveDirection = true;
+    public float turnSpeed = 720f;
     [FormerlySerializedAs("snapToCurrentNodeOnStart")]
     public bool snapToStartPointOnStart = true;
     public bool useSurfaceHeight;
@@ -22,6 +23,7 @@ public class ARBookPlayerMover : MonoBehaviour
     public float navMeshSampleDistance = 3f;
 
     private Coroutine moveRoutine;
+    private Quaternion modelFacingCorrection = Quaternion.identity;
 
     private void Awake()
     {
@@ -39,6 +41,8 @@ public class ARBookPlayerMover : MonoBehaviour
         {
             ActivateVisibleModel();
         }
+
+        CacheModelFacingCorrection();
 
         if (snapToStartPointOnStart && startPoint != null)
         {
@@ -98,17 +102,30 @@ public class ARBookPlayerMover : MonoBehaviour
             areaMask = areaMask
         };
 
-        if (!NavMesh.SamplePosition(
-                transform.position,
-                out NavMeshHit startHit,
-                navMeshSampleDistance,
-                areaMask) ||
-            !NavMesh.SamplePosition(
-                worldPoint,
-                out NavMeshHit targetHit,
-                navMeshSampleDistance,
-                areaMask))
+        float sampleDistance = Mathf.Max(navMeshSampleDistance, navMeshAgent.height * 2f);
+        bool foundStart = NavMesh.SamplePosition(
+            transform.position,
+            out NavMeshHit startHit,
+            sampleDistance,
+            areaMask);
+        bool foundTarget = NavMesh.SamplePosition(
+            worldPoint,
+            out NavMeshHit targetHit,
+            sampleDistance,
+            areaMask);
+
+        if (!foundTarget)
         {
+            Debug.LogWarning(
+                $"{name} could not find NavMesh near the tapped point {worldPoint}.");
+            yield break;
+        }
+
+        if (!foundStart)
+        {
+            Debug.LogWarning(
+                $"{name} is outside the baked NavMesh. Moving directly to the nearest valid point.");
+            yield return MoveToWorldPositionRoutine(targetHit.position);
             yield break;
         }
 
@@ -117,6 +134,9 @@ public class ARBookPlayerMover : MonoBehaviour
             path.status != NavMeshPathStatus.PathComplete ||
             path.corners.Length < 2)
         {
+            Debug.LogWarning(
+                $"{name} could not calculate a complete NavMesh path. Moving directly to the valid point.");
+            yield return MoveToWorldPositionRoutine(targetHit.position);
             yield break;
         }
 
@@ -135,6 +155,20 @@ public class ARBookPlayerMover : MonoBehaviour
 
             yield return MoveToLocalPositionRoutine(localCorner);
         }
+    }
+
+    private IEnumerator MoveToWorldPositionRoutine(Vector3 worldPosition)
+    {
+        Transform movementSpace = GetMovementSpace();
+        Vector3 localPosition = movementSpace != null
+            ? movementSpace.InverseTransformPoint(worldPosition)
+            : worldPosition;
+
+        localPosition.y = useSurfaceHeight
+            ? localPosition.y + heightOffset
+            : transform.localPosition.y;
+
+        yield return MoveToLocalPositionRoutine(localPosition);
     }
 
     private IEnumerator MoveToLocalPositionRoutine(Vector3 targetPosition)
@@ -159,14 +193,51 @@ public class ARBookPlayerMover : MonoBehaviour
                 moveDirection.y = 0f;
                 if (moveDirection.sqrMagnitude > 0.0001f)
                 {
-                    transform.localRotation =
+                    Quaternion movementRotation =
                         Quaternion.LookRotation(moveDirection.normalized, Vector3.up);
+                    Quaternion targetRotation =
+                        movementRotation * modelFacingCorrection;
+
+                    transform.localRotation = Quaternion.RotateTowards(
+                        transform.localRotation,
+                        targetRotation,
+                        turnSpeed * Time.deltaTime);
                 }
             }
 
             transform.localPosition = nextPosition;
             yield return null;
         }
+    }
+
+    private void CacheModelFacingCorrection()
+    {
+        Transform modelTransform = visibleModel != null
+            ? visibleModel.transform
+            : transform.childCount > 0
+                ? transform.GetChild(0)
+                : null;
+
+        if (modelTransform == null)
+        {
+            modelFacingCorrection = Quaternion.identity;
+            return;
+        }
+
+        Vector3 modelForwardInParent = transform.InverseTransformDirection(
+            modelTransform.forward);
+        modelForwardInParent.y = 0f;
+
+        if (modelForwardInParent.sqrMagnitude <= 0.0001f)
+        {
+            modelFacingCorrection = Quaternion.identity;
+            return;
+        }
+
+        Quaternion modelAxisRotation = Quaternion.LookRotation(
+            modelForwardInParent.normalized,
+            Vector3.up);
+        modelFacingCorrection = Quaternion.Inverse(modelAxisRotation);
     }
 
     private Transform GetMovementSpace()

@@ -89,9 +89,8 @@ public class ARTapRaycaster : MonoBehaviour
                 if (interactImmediatelyOnModelTap)
                 {
                     interactable.Interact();
+                    return;
                 }
-
-                return;
             }
         }
 
