@@ -6,6 +6,287 @@
 
 ---
 
+## 0. 当前实现快照（2026-06-10）
+
+> 本节描述当前工程中的实际实现，优先级高于后文保留的早期节点移动设计和历史任务记录。
+
+### 0.1 当前可用功能
+
+```text
+1. Vuforia 识别封面与 Chapter 1-5 实体书页
+2. 每个 ImageTarget 独立控制对应 ChapterRoot 显示和隐藏
+3. 同一时刻只允许追踪一个主 ImageTarget，避免翻页后旧章节滞留
+4. 点击或触摸章节地面，玩家通过 NavMesh 路径移动
+5. 玩家在不同章节中自动查找本章 PlayerMover
+6. 玩家接近 NPC 或精灵后显示交互按钮
+7. 支持多句对白、循环对白和角色朝向摄像机
+8. 支持可收服精灵、收服按钮和收服后事件
+9. 使用 PlayerPrefs 保存收服记录、章节完成状态和记忆碎片
+10. 到达章节终点后检查指定精灵是否已收服
+11. 章节完成时播放粒子效果并显示完成对白
+12. 玩家模型移动时自动校正模型正面并平滑转向
+```
+
+当前主场景：
+
+```text
+Assets/Scenes/PokemonGame_ARBook.unity
+```
+
+### 0.2 AR 识别与章节显隐
+
+主识别目标：
+
+| ImageTarget | 内容根对象 |
+|---|---|
+| `CoverTarget` | `CoverRoot` |
+| `Chapter01Target` | `Chapter01Root` |
+| `Chapter02Target` | `Chapter02Root` |
+| `Chapter03Target` | `Chapter03Root` |
+| `Chapter04Target` | `Chapter04Root` |
+| `Chapter05Target` | `Chapter05Root` |
+
+每个 Target 使用 `DefaultObserverEventHandler`：
+
+```text
+OnTargetFound -> ChapterRoot.SetActive(true)
+OnTargetLost  -> ChapterRoot.SetActive(false)
+StatusFilter  -> Tracked
+```
+
+Vuforia 当前配置：
+
+```text
+maxSimultaneousImageTargets = 1
+```
+
+这样做是因为实体书一次只应展示一个章节。若允许同时追踪多张图，相似书页或翻页过程可能让旧章节和新章节同时保留。
+
+注意：
+
+```text
+更换或删除 ChapterRoot 后，必须重新检查 Found/Lost 的对象引用。
+Unity 会把已删除对象的 UnityEvent 引用变成 Missing 或 fileID 0。
+```
+
+### 0.3 当前章节标准层级
+
+```text
+ChapterXXTarget
+└── ChapterXXRoot
+    ├── PlayerAvatar
+    │   └── VisibleModel
+    ├── Nodes
+    │   ├── start
+    │   └── end
+    ├── Environment
+    ├── Creatures
+    └── Navigation Root
+        ├── WalkableGround
+        └── Obstacles
+```
+
+约束：
+
+```text
+1. PlayerAvatar 必须直接位于本章 ChapterRoot 下。
+2. ARBookPlayerMover.routeRoot 必须指向本章 ChapterRoot。
+3. startPoint 必须指向本章 start。
+4. visibleModel 必须指向 PlayerAvatar 下实际可见的模型根对象。
+5. Navigation Root 必须持有本章 NavMeshSurface 和本章 NavMeshData。
+6. 可点击地面及其有效 Collider 必须位于 MovingLayer（当前为 Layer 6）。
+```
+
+### 0.4 点击地面与 NavMesh 移动
+
+当前移动不再依赖 `Node_01` 到 `Node_16` 的顺序节点路线。`ARBookMapNode` 仅为避免旧场景组件丢失而保留。
+
+移动流程：
+
+```text
+触摸屏幕或点击鼠标
+  -> ARTapRaycaster 从 MainCamera 发射 Physics.RaycastAll
+  -> 按距离排序命中结果
+  -> 检查可直接交互对象
+  -> 查找 Layer 6 的可行走地面 Collider
+  -> 从地面父层级查找当前章节 ARBookPlayerMover
+  -> MoveToSurfacePoint(hit.point)
+  -> NavMesh.SamplePosition 采样起点和目标点
+  -> NavMesh.CalculatePath 计算完整路径
+  -> 玩家依次移动到 path.corners
+```
+
+`ARBookPlayerMover` 当前实现：
+
+```text
+- NavMeshAgent 只提供 agentTypeID、areaMask、尺寸等配置。
+- updatePosition 和 updateRotation 被关闭。
+- 实际位移由协程使用 Vector3.MoveTowards 完成。
+- 起点不在 NavMesh 上时，回退到最近有效目标点。
+- 路径不完整时，回退到有效目标点直接移动。
+- NavMesh 采样失败会输出 Debug.LogWarning。
+```
+
+NavMesh 显示为蓝色不代表地面一定可以点击。点击移动同时要求：
+
+```text
+1. 地面在 MovingLayer（Layer 6）。
+2. 地面拥有启用的 Collider。
+3. MeshCollider 的 sharedMesh 不能是空引用。
+4. ARTapRaycaster.raycastLayers 包含地面 Layer。
+5. walkableSurfaceLayers 包含地面 Layer。
+```
+
+第二章曾出现 NavMesh 正常但无法点击的问题，原因是 `objPlane03` 的 `MeshCollider` 存在，但 Collider 的 Mesh 为空。NavMesh 可以从渲染网格烘焙成功，而 Physics.Raycast 无法命中空 Collider。
+
+### 0.5 玩家朝向自适应
+
+不同角色模型的导入正面轴和场景内子模型旋转可能不同，不能假设 `PlayerAvatar.forward` 就是视觉正面。
+
+当前处理方式：
+
+```text
+1. 启动时读取 visibleModel.transform.forward。
+2. 转换为 PlayerAvatar 本地空间中的模型正面轴。
+3. 计算 modelFacingCorrection。
+4. 移动时使用 LookRotation 对准移动方向。
+5. 叠加 modelFacingCorrection，使模型视觉正面朝向路径方向。
+6. 使用 Quaternion.RotateTowards 平滑转身。
+```
+
+相关参数：
+
+```text
+rotateToMoveDirection = true
+turnSpeed = 720
+```
+
+不要通过记录 `PlayerAvatar` 初始旋转来判断模型正面，因为初始旋转可能只是人工摆放结果。
+
+### 0.6 NPC、精灵与按钮交互
+
+`ARBookInteractable` 提供：
+
+```text
+- 显示名称
+- 多句或循环对白
+- 交互距离
+- 交互时朝向摄像机
+- 动画 Trigger
+- 是否可收服
+- captureId
+- 收服对白
+- onCaptured UnityEvent
+```
+
+`ARBookInteractionButton` 每帧：
+
+```text
+1. 查找当前激活章节的 PlayerMover。
+2. 查找距离内最近的 ARBookInteractable。
+3. 显示或隐藏 InteractButton。
+4. 更新交互提示文字。
+5. 把当前目标同步给 ARBookCaptureController。
+```
+
+`ARBookProximityTrigger` 用于不需要按钮的自动触发事件：
+
+```text
+玩家首次进入 triggerRadius
+  -> 调用 onPlayerEntered
+```
+
+### 0.7 收服、存档与章节完成
+
+收服流程：
+
+```text
+玩家进入精灵交互范围
+  -> InteractButton 显示
+  -> ARBookCaptureController 获得当前目标
+  -> CaptureButton 在目标可收服且未收服时显示
+  -> 点击后写入 PlayerPrefs
+  -> 显示收服对白
+  -> 调用目标 onCaptured
+```
+
+主要存档键：
+
+```text
+Captured_<captureId>
+CapturedIds
+ChapterCompleted_<chapterId>
+MemoryFragment_<chapterId>
+```
+
+章节完成流程：
+
+```text
+玩家进入终点范围
+  -> ARBookChapterCompletionTrigger.TryCompleteChapter()
+  -> 检查 requiredCaptureId 是否已收服
+  -> 播放 transitionEffectRoot 或 transitionEffect
+  -> 保存章节完成和记忆碎片
+  -> 显示 Chapter Complete 对白
+```
+
+### 0.8 核心脚本职责
+
+| 脚本 | 当前职责 |
+|---|---|
+| `ARTapRaycaster` | 读取触摸/鼠标输入，处理射线命中并请求地面移动 |
+| `ARBookPlayerMover` | NavMesh 采样、寻路、协程移动、模型正面校正 |
+| `ARBookMapNode` | 旧场景兼容组件，不再承担主要移动逻辑 |
+| `ARBookInteractable` | NPC/精灵对白、动画、收服数据 |
+| `ARBookInteractionButton` | 查找当前玩家和最近交互目标，控制交互按钮 |
+| `ARBookProximityTrigger` | 玩家进入半径时触发 UnityEvent |
+| `DialogueManager` | 多句对白显示、继续和关闭 |
+| `ARBookCaptureController` | 控制收服按钮和当前可收服目标 |
+| `ARBookCollectionManager` | 使用 PlayerPrefs 保存收服记录 |
+| `ARBookChapterProgress` | 保存章节完成和记忆碎片状态 |
+| `ARBookChapterCompletionTrigger` | 检查完成条件、播放特效并结束章节 |
+| `BillboardToCamera` | 让提示或 UI 始终面向摄像机 |
+
+### 0.9 当前调试检查清单
+
+当章节识别后内容不显示：
+
+```text
+1. 检查 Target 的 OnTargetFound/OnTargetLost 是否引用正确 ChapterRoot。
+2. 检查 ChapterRoot 是否仍是 Target 的直接子对象。
+3. 检查 UnityEvent 是否出现 Missing 或 fileID 0。
+```
+
+当人物出现位置偏移：
+
+```text
+1. 检查 PlayerAvatar 是否直接位于 ChapterRoot 下。
+2. 检查 routeRoot 是否指向本章 ChapterRoot。
+3. 检查 VisibleModel 的 localPosition，通常 X/Z 应接近 0。
+4. 不要把视觉模型大幅偏移来代替移动 PlayerAvatar。
+```
+
+当点击地面不移动：
+
+```text
+1. 检查地面 Layer 是否为 6。
+2. 检查 Collider 是否启用。
+3. 检查 MeshCollider.sharedMesh 是否为空。
+4. 检查本章 NavMeshSurface 是否引用正确 NavMeshData。
+5. 查看 Console 中 NavMesh SamplePosition/CalculatePath 警告。
+```
+
+当人物倒着走：
+
+```text
+1. 检查 visibleModel 是否引用实际模型根对象。
+2. 检查模型根对象的 forward 是否代表视觉正面。
+3. 保持 rotateToMoveDirection 开启。
+4. 不要用 PlayerAvatar 初始旋转代替模型正面校正。
+```
+
+---
+
 ## 1. 项目定位
 
 本项目是一款基于 Unity 与 Vuforia 的移动端 AR 冒险书应用。
