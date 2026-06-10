@@ -12,11 +12,17 @@ public class ARBookInteractionButton : MonoBehaviour
     public bool hideButtonWhenNoTarget = true;
     public ARBookCaptureController captureController;
     public bool useActivePlayerMover = true;
+    public bool activateCapturableInteractablesOnStart = true;
 
     private ARBookInteractable currentInteractable;
 
     private void Start()
     {
+        if (activateCapturableInteractablesOnStart)
+        {
+            ActivateCapturableInteractables();
+        }
+
         if (playerMover == null)
         {
             playerMover = FindObjectOfType<ARBookPlayerMover>();
@@ -37,6 +43,19 @@ public class ARBookInteractionButton : MonoBehaviour
         }
 
         RefreshCurrentTarget();
+    }
+
+    private void ActivateCapturableInteractables()
+    {
+        ARBookInteractable[] interactables = FindObjectsOfType<ARBookInteractable>(true);
+        for (int i = 0; i < interactables.Length; i++)
+        {
+            ARBookInteractable interactable = interactables[i];
+            if (interactable != null && interactable.canBeCaptured)
+            {
+                interactable.gameObject.SetActive(true);
+            }
+        }
     }
 
     private void Update()

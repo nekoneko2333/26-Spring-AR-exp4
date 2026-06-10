@@ -1,66 +1,53 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
+using UnityEngine.AI;
+using UnityEngine.Serialization;
 
 public class ARBookPlayerMover : MonoBehaviour
 {
     public float moveSpeed = 2f;
     public float stopDistance = 0.01f;
     public Transform routeRoot;
-    public Transform currentNode;
+    [FormerlySerializedAs("currentNode")] public Transform startPoint;
     public bool isMoving;
     public bool rotateToMoveDirection = true;
-    public bool snapToCurrentNodeOnStart = true;
-    public bool useNearestNodeAsStart = true;
-    public bool useNodeHeight;
+    [FormerlySerializedAs("snapToCurrentNodeOnStart")]
+    public bool snapToStartPointOnStart = true;
+    public bool useSurfaceHeight;
     public float heightOffset;
     public GameObject visibleModel;
     public bool activateVisibleModelOnStart = true;
-    public bool ignoreMoveRequestsWhileMoving = true;
-    public bool moveDirectlyToTappedNode = true;
-    public ARBookMapNode[] orderedNodes;
+    public bool ignoreMoveRequestsWhileMoving;
+    public NavMeshAgent navMeshAgent;
+    public float navMeshSampleDistance = 3f;
 
     private Coroutine moveRoutine;
 
+    private void Awake()
+    {
+        ConfigureNavMeshAgent();
+    }
+
     private void Start()
     {
-        if (moveSpeed < 0.5f)
+        if (moveSpeed < 0.01f)
         {
             moveSpeed = 2f;
         }
-
-        EnsureOrderedNodes();
 
         if (activateVisibleModelOnStart)
         {
             ActivateVisibleModel();
         }
 
-        if (useNearestNodeAsStart)
+        if (snapToStartPointOnStart && startPoint != null)
         {
-            SetCurrentNodeToNearestNode();
-        }
-
-        if (snapToCurrentNodeOnStart && currentNode != null)
-        {
-            SetPositionAtNode(currentNode);
+            SetPositionAtStartPoint();
         }
     }
 
-    public void MoveToNode(ARBookMapNode targetNode)
+    public void MoveToSurfacePoint(Vector3 worldPoint)
     {
-        if (targetNode == null)
-        {
-            Debug.LogWarning("MoveToNode was called with a null target node.");
-            return;
-        }
-
-        if (!targetNode.isUnlocked)
-        {
-            return;
-        }
-
         if (isMoving && ignoreMoveRequestsWhileMoving)
         {
             return;
@@ -71,43 +58,100 @@ public class ARBookPlayerMover : MonoBehaviour
             StopCoroutine(moveRoutine);
         }
 
-        moveRoutine = StartCoroutine(MoveAlongRouteRoutine(targetNode));
+        moveRoutine = StartCoroutine(MoveToSurfacePointRoutine(worldPoint));
     }
 
-    private IEnumerator MoveAlongRouteRoutine(ARBookMapNode targetNode)
+    public float GetDistanceTo(Vector3 worldPoint)
     {
-        isMoving = true;
-
-        List<ARBookMapNode> route = BuildRoute(targetNode);
-        for (int i = 0; i < route.Count; i++)
+        Transform movementSpace = GetMovementSpace();
+        if (movementSpace == null)
         {
-            yield return MoveOneStepRoutine(route[i]);
-            currentNode = route[i].transform;
-            route[i].onNodeReached?.Invoke();
+            return Vector3.Distance(transform.position, worldPoint);
         }
 
+        Vector3 localPoint = movementSpace.InverseTransformPoint(worldPoint);
+        return Vector3.Distance(transform.localPosition, localPoint);
+    }
+
+    private IEnumerator MoveToSurfacePointRoutine(Vector3 worldPoint)
+    {
+        isMoving = true;
+        yield return MoveWithNavMeshRoutine(worldPoint);
         isMoving = false;
         moveRoutine = null;
     }
 
-    private IEnumerator MoveOneStepRoutine(ARBookMapNode targetNode)
+    private IEnumerator MoveWithNavMeshRoutine(Vector3 worldPoint)
     {
+        ConfigureNavMeshAgent();
+
+        if (navMeshAgent == null)
+        {
+            Debug.LogWarning("NavMesh movement requires a NavMeshAgent.");
+            yield break;
+        }
+
+        int areaMask = navMeshAgent.areaMask;
+        NavMeshQueryFilter filter = new NavMeshQueryFilter
+        {
+            agentTypeID = navMeshAgent.agentTypeID,
+            areaMask = areaMask
+        };
+
+        if (!NavMesh.SamplePosition(
+                transform.position,
+                out NavMeshHit startHit,
+                navMeshSampleDistance,
+                areaMask) ||
+            !NavMesh.SamplePosition(
+                worldPoint,
+                out NavMeshHit targetHit,
+                navMeshSampleDistance,
+                areaMask))
+        {
+            yield break;
+        }
+
+        NavMeshPath path = new NavMeshPath();
+        if (!NavMesh.CalculatePath(startHit.position, targetHit.position, filter, path) ||
+            path.status != NavMeshPathStatus.PathComplete ||
+            path.corners.Length < 2)
+        {
+            yield break;
+        }
+
         Transform movementSpace = GetMovementSpace();
         float fixedY = transform.localPosition.y;
 
+        for (int i = 1; i < path.corners.Length; i++)
+        {
+            Vector3 localCorner = movementSpace != null
+                ? movementSpace.InverseTransformPoint(path.corners[i])
+                : path.corners[i];
+
+            localCorner.y = useSurfaceHeight
+                ? localCorner.y + heightOffset
+                : fixedY;
+
+            yield return MoveToLocalPositionRoutine(localCorner);
+        }
+    }
+
+    private IEnumerator MoveToLocalPositionRoutine(Vector3 targetPosition)
+    {
         while (true)
         {
             Vector3 currentPosition = transform.localPosition;
-            Vector3 targetPosition = GetTargetLocalPosition(targetNode.transform, movementSpace);
-            targetPosition.y = useNodeHeight ? targetPosition.y + heightOffset : fixedY;
-
             if (Vector3.Distance(currentPosition, targetPosition) <= stopDistance)
             {
                 transform.localPosition = targetPosition;
                 yield break;
             }
 
-            Vector3 nextPosition = Vector3.MoveTowards(currentPosition, targetPosition, moveSpeed * Time.deltaTime);
+            Vector3 nextPosition = Vector3.MoveTowards(
+                currentPosition,
+                targetPosition,
+                moveSpeed * Time.deltaTime);
 
             Vector3 moveDirection = nextPosition - currentPosition;
             if (rotateToMoveDirection && moveDirection.sqrMagnitude > 0.0001f)
@@ -115,119 +159,31 @@ public class ARBookPlayerMover : MonoBehaviour
                 moveDirection.y = 0f;
                 if (moveDirection.sqrMagnitude > 0.0001f)
                 {
-                    transform.localRotation = Quaternion.LookRotation(moveDirection.normalized, Vector3.up);
+                    transform.localRotation =
+                        Quaternion.LookRotation(moveDirection.normalized, Vector3.up);
                 }
             }
 
             transform.localPosition = nextPosition;
-
             yield return null;
         }
     }
 
-    private List<ARBookMapNode> BuildRoute(ARBookMapNode targetNode)
-    {
-        if (moveDirectlyToTappedNode)
-        {
-            return new List<ARBookMapNode> { targetNode };
-        }
-
-        EnsureOrderedNodes();
-
-        if (orderedNodes == null || orderedNodes.Length == 0 || currentNode == null)
-        {
-            return new List<ARBookMapNode> { targetNode };
-        }
-
-        ARBookMapNode currentMapNode = currentNode.GetComponent<ARBookMapNode>();
-        if (currentMapNode == null)
-        {
-            return new List<ARBookMapNode> { targetNode };
-        }
-
-        int currentIndex = System.Array.IndexOf(orderedNodes, currentMapNode);
-        int targetIndex = System.Array.IndexOf(orderedNodes, targetNode);
-        if (currentIndex < 0 || targetIndex < 0)
-        {
-            return new List<ARBookMapNode> { targetNode };
-        }
-
-        List<ARBookMapNode> route = new List<ARBookMapNode>();
-        int step = targetIndex >= currentIndex ? 1 : -1;
-
-        for (int i = currentIndex + step; i != targetIndex + step; i += step)
-        {
-            if (orderedNodes[i] != null && orderedNodes[i].isUnlocked)
-            {
-                route.Add(orderedNodes[i]);
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        return route;
-    }
-
-    private void EnsureOrderedNodes()
-    {
-        if (orderedNodes != null && orderedNodes.Length > 0)
-        {
-            return;
-        }
-
-        Transform searchRoot = GetMovementSpace();
-        ARBookMapNode[] nodes = searchRoot != null
-            ? searchRoot.GetComponentsInChildren<ARBookMapNode>(true)
-            : FindObjectsOfType<ARBookMapNode>();
-
-        orderedNodes = nodes
-            .Where(node => node != null && node.nodeIndex > 0)
-            .OrderBy(node => node.nodeIndex)
-            .ToArray();
-    }
-
-    private Vector3 GetTargetLocalPosition(Transform target, Transform movementSpace)
-    {
-        if (movementSpace != null)
-        {
-            return movementSpace.InverseTransformPoint(target.position);
-        }
-
-        if (target.parent == transform.parent)
-        {
-            return target.localPosition;
-        }
-
-        return transform.parent != null
-            ? transform.parent.InverseTransformPoint(target.position)
-            : target.position;
-    }
-
     private Transform GetMovementSpace()
     {
-        if (routeRoot != null)
-        {
-            return routeRoot;
-        }
-
-        return transform.parent;
+        return routeRoot != null ? routeRoot : transform.parent;
     }
 
-    private void SetPositionAtNode(Transform node)
+    private void SetPositionAtStartPoint()
     {
         Transform movementSpace = GetMovementSpace();
-        Vector3 targetPosition = GetTargetLocalPosition(node, movementSpace);
+        Vector3 targetPosition = movementSpace != null
+            ? movementSpace.InverseTransformPoint(startPoint.position)
+            : startPoint.position;
 
-        if (useNodeHeight)
-        {
-            targetPosition.y += heightOffset;
-        }
-        else
-        {
-            targetPosition.y = transform.localPosition.y;
-        }
+        targetPosition.y = useSurfaceHeight
+            ? targetPosition.y + heightOffset
+            : transform.localPosition.y;
 
         transform.localPosition = targetPosition;
     }
@@ -246,49 +202,24 @@ public class ARBookPlayerMover : MonoBehaviour
         }
     }
 
-    private void SetCurrentNodeToNearestNode()
+    private void ConfigureNavMeshAgent()
     {
-        ARBookMapNode nearestNode = FindNearestNode();
-        if (nearestNode == null)
+        if (navMeshAgent == null)
+        {
+            navMeshAgent = GetComponent<NavMeshAgent>();
+        }
+
+        if (navMeshAgent == null)
         {
             return;
         }
 
-        currentNode = nearestNode.transform;
-    }
+        navMeshAgent.updatePosition = false;
+        navMeshAgent.updateRotation = false;
 
-    private ARBookMapNode FindNearestNode()
-    {
-        if (orderedNodes == null || orderedNodes.Length == 0)
+        if (navMeshAgent.enabled)
         {
-            return null;
+            navMeshAgent.enabled = false;
         }
-
-        Transform movementSpace = GetMovementSpace();
-        Vector3 currentPosition = transform.localPosition;
-
-        ARBookMapNode nearestNode = null;
-        float nearestDistance = float.MaxValue;
-
-        for (int i = 0; i < orderedNodes.Length; i++)
-        {
-            ARBookMapNode node = orderedNodes[i];
-            if (node == null)
-            {
-                continue;
-            }
-
-            Vector3 nodePosition = GetTargetLocalPosition(node.transform, movementSpace);
-            nodePosition.y = currentPosition.y;
-            float distance = Vector3.Distance(currentPosition, nodePosition);
-
-            if (distance < nearestDistance)
-            {
-                nearestDistance = distance;
-                nearestNode = node;
-            }
-        }
-
-        return nearestNode;
     }
 }

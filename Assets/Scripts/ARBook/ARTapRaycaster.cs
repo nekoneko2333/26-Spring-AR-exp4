@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System;
 
 public class ARTapRaycaster : MonoBehaviour
 {
@@ -7,6 +8,8 @@ public class ARTapRaycaster : MonoBehaviour
     public LayerMask raycastLayers = ~0;
     public float tapCooldown = 0.15f;
     public bool interactImmediatelyOnModelTap;
+    public bool enableSurfaceMovement;
+    public LayerMask walkableSurfaceLayers;
 
     private float nextTapTime;
 
@@ -69,26 +72,80 @@ public class ARTapRaycaster : MonoBehaviour
         }
 
         Ray ray = mainCamera.ScreenPointToRay(screenPosition);
-        if (!Physics.Raycast(ray, out RaycastHit hit, raycastDistance, raycastLayers))
+        RaycastHit[] hits = Physics.RaycastAll(ray, raycastDistance, raycastLayers);
+        if (hits.Length == 0)
         {
             return;
         }
 
-        ARBookMapNode node = hit.collider.GetComponentInParent<ARBookMapNode>();
-        if (node != null)
-        {
-            node.OnTapped();
-            return;
-        }
+        Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
 
-        ARBookInteractable interactable = hit.collider.GetComponentInParent<ARBookInteractable>();
-        if (interactable != null)
+        for (int i = 0; i < hits.Length; i++)
         {
-            if (interactImmediatelyOnModelTap)
+            ARBookInteractable interactable =
+                hits[i].collider.GetComponentInParent<ARBookInteractable>();
+            if (interactable != null)
             {
-                interactable.Interact();
+                if (interactImmediatelyOnModelTap)
+                {
+                    interactable.Interact();
+                }
+
+                return;
             }
         }
+
+        if (!enableSurfaceMovement)
+        {
+            return;
+        }
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (!IsLayerInMask(hits[i].collider.gameObject.layer, walkableSurfaceLayers))
+            {
+                continue;
+            }
+
+            ARBookPlayerMover mover = FindPlayerMoverForSurface(hits[i].collider.transform);
+            if (mover != null)
+            {
+                mover.MoveToSurfacePoint(hits[i].point);
+            }
+
+            return;
+        }
+    }
+
+    private bool IsLayerInMask(int layer, LayerMask layerMask)
+    {
+        return (layerMask.value & (1 << layer)) != 0;
+    }
+
+    private ARBookPlayerMover FindPlayerMoverForSurface(Transform surface)
+    {
+        Transform parent = surface;
+        while (parent != null)
+        {
+            ARBookPlayerMover mover = parent.GetComponentInChildren<ARBookPlayerMover>(true);
+            if (mover != null && mover.gameObject.activeInHierarchy)
+            {
+                return mover;
+            }
+
+            parent = parent.parent;
+        }
+
+        ARBookPlayerMover[] movers = FindObjectsOfType<ARBookPlayerMover>(true);
+        for (int i = 0; i < movers.Length; i++)
+        {
+            if (movers[i] != null && movers[i].gameObject.activeInHierarchy)
+            {
+                return movers[i];
+            }
+        }
+
+        return null;
     }
 
     private bool IsPointerOverUI(int fingerId)

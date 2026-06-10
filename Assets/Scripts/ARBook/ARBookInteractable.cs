@@ -8,10 +8,7 @@ public class ARBookInteractable : MonoBehaviour
     public string animationTriggerName;
     public bool faceCameraOnInteract = true;
     public bool cycleDialogue = true;
-    public ARBookMapNode interactionNode;
-    public int interactionNodeIndex;
     public float interactionRadius = 2f;
-    public bool requirePlayerAtInteractionNode = true;
     public bool canBeCaptured;
     public bool isCaptured;
     public string captureId;
@@ -32,16 +29,7 @@ public class ARBookInteractable : MonoBehaviour
             return true;
         }
 
-        if (requirePlayerAtInteractionNode)
-        {
-            ARBookMapNode requiredNode = GetInteractionNode();
-            if (requiredNode != null)
-            {
-                return playerMover.currentNode == requiredNode.transform;
-            }
-        }
-
-        return Vector3.Distance(playerMover.transform.position, transform.position) <= interactionRadius;
+        return playerMover.GetDistanceTo(transform.position) <= interactionRadius;
     }
 
     public void Interact()
@@ -121,49 +109,4 @@ public class ARBookInteractable : MonoBehaviour
         return string.IsNullOrWhiteSpace(displayName) ? gameObject.name : displayName;
     }
 
-    private ARBookMapNode GetInteractionNode()
-    {
-        if (interactionNode != null)
-        {
-            return interactionNode;
-        }
-
-        if (interactionNodeIndex <= 0)
-        {
-            return null;
-        }
-
-        ARBookMapNode[] nodes = FindNodesInSameChapterRoot();
-
-        for (int i = 0; i < nodes.Length; i++)
-        {
-            if (nodes[i].nodeIndex == interactionNodeIndex)
-            {
-                interactionNode = nodes[i];
-                return interactionNode;
-            }
-        }
-
-        return null;
-    }
-
-    private ARBookMapNode[] FindNodesInSameChapterRoot()
-    {
-        Transform parent = transform;
-        while (parent != null)
-        {
-            if (parent.GetComponentInChildren<ARBookPlayerMover>(true) != null)
-            {
-                ARBookMapNode[] nodes = parent.GetComponentsInChildren<ARBookMapNode>(true);
-                if (nodes.Length > 0)
-                {
-                    return nodes;
-                }
-            }
-
-            parent = parent.parent;
-        }
-
-        return FindObjectsOfType<ARBookMapNode>();
-    }
 }
