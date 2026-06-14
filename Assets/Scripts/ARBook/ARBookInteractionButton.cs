@@ -8,7 +8,7 @@ public class ARBookInteractionButton : MonoBehaviour
     public Button interactButton;
     public Text promptText;
     public TMP_Text promptTMPText;
-    public string promptFormat = "Interact: {0}";
+    public string promptFormat = "互动：{0}";
     public bool hideButtonWhenNoTarget = true;
     public ARBookCaptureController captureController;
     public bool useActivePlayerMover = true;
@@ -18,6 +18,11 @@ public class ARBookInteractionButton : MonoBehaviour
 
     private void Start()
     {
+        if (promptFormat == "Interact: {0}")
+        {
+            promptFormat = "互动：{0}";
+        }
+
         if (activateCapturableInteractablesOnStart)
         {
             ActivateCapturableInteractables();

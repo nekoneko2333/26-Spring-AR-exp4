@@ -82,6 +82,14 @@ public class ARTapRaycaster : MonoBehaviour
 
         for (int i = 0; i < hits.Length; i++)
         {
+            ARBookCollectible collectible =
+                hits[i].collider.GetComponentInParent<ARBookCollectible>();
+            if (collectible != null && collectible.collectOnTap)
+            {
+                collectible.TryCollect();
+                return;
+            }
+
             ARBookInteractable interactable =
                 hits[i].collider.GetComponentInParent<ARBookInteractable>();
             if (interactable != null)

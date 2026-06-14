@@ -1,4 +1,5 @@
 using TMPro;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,6 +9,10 @@ public class ARVirtualPetController : MonoBehaviour
     [Range(0, 100)] public float mood = 70f;
     [Range(0, 100)] public float hunger = 35f;
     public bool isSleeping;
+    public string petId = "DefaultPet";
+    public bool saveState = true;
+    public float offlineHungerIncreasePerHour = 8f;
+    public float offlineMoodDecreasePerHour = 5f;
 
     [Header("State Change")]
     public float hungerIncreasePerSecond = 1.2f;
@@ -35,6 +40,25 @@ public class ARVirtualPetController : MonoBehaviour
     {
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>();
+    }
+
+    private void Start()
+    {
+        LoadState();
+        RefreshUI();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+        {
+            SaveState();
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveState();
     }
 
     private void Update()
@@ -66,6 +90,7 @@ public class ARVirtualPetController : MonoBehaviour
         PlayEffect(feedEffect);
         PlayClip(feedClip);
         SetStatus("吃饱啦");
+        SaveState();
     }
 
     public void Pet()
@@ -76,6 +101,7 @@ public class ARVirtualPetController : MonoBehaviour
         PlayEffect(happyEffect);
         PlayClip(petClip);
         SetStatus("被摸摸很开心");
+        SaveState();
     }
 
     public void Play()
@@ -87,6 +113,7 @@ public class ARVirtualPetController : MonoBehaviour
         PlayEffect(happyEffect);
         PlayClip(playClip);
         SetStatus("正在玩耍");
+        SaveState();
     }
 
     public void ToggleSleep()
@@ -95,6 +122,7 @@ public class ARVirtualPetController : MonoBehaviour
         TriggerAnimation(isSleeping ? "Sleep" : "Wake");
         PlayClip(sleepClip);
         SetStatus(isSleeping ? "睡觉恢复心情" : "醒来了");
+        SaveState();
     }
 
     public void WakeUp()
@@ -107,6 +135,7 @@ public class ARVirtualPetController : MonoBehaviour
         isSleeping = false;
         TriggerAnimation("Wake");
         SetStatus("醒来了");
+        SaveState();
     }
 
     private void OnMouseDown()
@@ -197,5 +226,45 @@ public class ARVirtualPetController : MonoBehaviour
         {
             audioSource.PlayOneShot(clip);
         }
+    }
+
+    public void SaveState()
+    {
+        if (!saveState)
+        {
+            return;
+        }
+
+        PlayerPrefs.SetFloat(GetKey("Mood"), mood);
+        PlayerPrefs.SetFloat(GetKey("Hunger"), hunger);
+        PlayerPrefs.SetInt(GetKey("Sleeping"), isSleeping ? 1 : 0);
+        PlayerPrefs.SetString(GetKey("LastSaveUtc"), DateTime.UtcNow.Ticks.ToString());
+        PlayerPrefs.Save();
+    }
+
+    private void LoadState()
+    {
+        if (!saveState)
+        {
+            return;
+        }
+
+        mood = PlayerPrefs.GetFloat(GetKey("Mood"), mood);
+        hunger = PlayerPrefs.GetFloat(GetKey("Hunger"), hunger);
+        isSleeping = PlayerPrefs.GetInt(GetKey("Sleeping"), isSleeping ? 1 : 0) == 1;
+
+        string ticksText = PlayerPrefs.GetString(GetKey("LastSaveUtc"), string.Empty);
+        if (long.TryParse(ticksText, out long ticks))
+        {
+            TimeSpan elapsed = DateTime.UtcNow - new DateTime(ticks, DateTimeKind.Utc);
+            float elapsedHours = Mathf.Max(0f, (float)elapsed.TotalHours);
+            hunger = Mathf.Clamp(hunger + offlineHungerIncreasePerHour * elapsedHours, 0f, 100f);
+            mood = Mathf.Clamp(mood - offlineMoodDecreasePerHour * elapsedHours, 0f, 100f);
+        }
+    }
+
+    private string GetKey(string suffix)
+    {
+        return $"Pet_{petId}_{suffix}";
     }
 }

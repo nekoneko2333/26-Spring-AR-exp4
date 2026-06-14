@@ -52,8 +52,23 @@ public class ARBookCaptureController : MonoBehaviour
 
     private void CaptureCurrentTarget()
     {
-        if (!CanCaptureCurrentTarget())
+        if (!CanShowCaptureButton())
         {
+            RefreshCaptureButton();
+            return;
+        }
+
+        ARBookCaptureRequirement requirement =
+            currentTarget.GetComponent<ARBookCaptureRequirement>();
+        if (requirement != null && !requirement.IsSatisfied())
+        {
+            if (dialogueManager != null)
+            {
+                dialogueManager.ShowDialogue(
+                    requirement.lockedSpeaker,
+                    requirement.GetLockedDialogue());
+            }
+
             RefreshCaptureButton();
             return;
         }
@@ -78,11 +93,11 @@ public class ARBookCaptureController : MonoBehaviour
     {
         if (captureButton != null)
         {
-            captureButton.gameObject.SetActive(CanCaptureCurrentTarget());
+            captureButton.gameObject.SetActive(CanShowCaptureButton());
         }
     }
 
-    private bool CanCaptureCurrentTarget()
+    private bool CanShowCaptureButton()
     {
         if (currentTarget == null || !currentTarget.canBeCaptured || currentTarget.isCaptured)
         {

@@ -1,8 +1,11 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 
 public class ARBookInteractable : MonoBehaviour
 {
+    public static event Action<ARBookInteractable> Interacted;
+
     public string displayName;
     [TextArea(2, 4)] public string[] dialogueFragments;
     public string animationTriggerName;
@@ -60,6 +63,7 @@ public class ARBookInteractable : MonoBehaviour
             return;
         }
 
+        Interacted?.Invoke(this);
         dialogueManager.ShowDialogueSequence(GetDisplayName(), GetDialogueSequence());
     }
 

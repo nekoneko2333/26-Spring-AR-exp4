@@ -4,12 +4,18 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
 {
     public int chapterId = 1;
     public string requiredCaptureId = "Pikachu";
+    public int[] requiredCompletedChapterIds;
+    public ARBookConditionGroup extraConditions = new ARBookConditionGroup();
     public string completeDialogue = "Chapter 1 is complete. Open Chapter 2.";
     public ARBookCollectionManager collectionManager;
     public ARBookChapterProgress chapterProgress;
+    public ARBookQuestTracker questTracker;
+    public DialogueManager dialogueManager;
     public GameObject transitionEffectRoot;
     public ParticleSystem transitionEffect;
     public bool onlyCompleteOnce = true;
+    public bool showMissingRequirementDialogue = true;
+    public string missingCaptureDialogueFormat = "还需要先收服 {0}。";
 
     private void Start()
     {
@@ -21,6 +27,18 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
         if (chapterProgress == null)
         {
             chapterProgress = FindObjectOfType<ARBookChapterProgress>();
+        }
+
+        if (questTracker == null)
+        {
+            questTracker = FindObjectOfType<ARBookQuestTracker>();
+        }
+
+        if (dialogueManager == null)
+        {
+            dialogueManager = DialogueManager.Instance != null
+                ? DialogueManager.Instance
+                : FindObjectOfType<DialogueManager>();
         }
     }
 
@@ -43,13 +61,73 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
             return;
         }
 
-        if (!collectionManager.IsCaptured(requiredCaptureId))
+        if (!HasRequiredChaptersCompleted())
         {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requiredCaptureId) &&
+            !collectionManager.IsCaptured(requiredCaptureId))
+        {
+            if (showMissingRequirementDialogue && dialogueManager != null)
+            {
+                dialogueManager.ShowDialogue(
+                    "章节目标",
+                    string.Format(missingCaptureDialogueFormat, requiredCaptureId));
+            }
+            return;
+        }
+
+        if (extraConditions != null &&
+            !extraConditions.IsMet(collectionManager, chapterProgress))
+        {
+            if (showMissingRequirementDialogue && dialogueManager != null)
+            {
+                dialogueManager.ShowDialogue(
+                    "Chapter Objective",
+                    "Some chapter conditions are not complete yet.");
+            }
             return;
         }
 
         PlayTransitionEffect();
         chapterProgress.CompleteChapterWithMemoryFragment(chapterId, completeDialogue);
+
+        if (questTracker != null && questTracker.chapterId == chapterId)
+        {
+            questTracker.NotifyChapterEndReached();
+        }
+    }
+
+    private bool HasRequiredChaptersCompleted()
+    {
+        if (requiredCompletedChapterIds == null || requiredCompletedChapterIds.Length == 0)
+        {
+            return true;
+        }
+
+        if (chapterProgress == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < requiredCompletedChapterIds.Length; i++)
+        {
+            int requiredChapterId = requiredCompletedChapterIds[i];
+            if (!chapterProgress.IsChapterCompleted(requiredChapterId))
+            {
+                if (showMissingRequirementDialogue && dialogueManager != null)
+                {
+                    dialogueManager.ShowDialogue(
+                        "章节目标",
+                        $"还需要先完成 Chapter {requiredChapterId}。");
+                }
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void PlayTransitionEffect()
