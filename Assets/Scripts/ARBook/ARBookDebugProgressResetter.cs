@@ -22,7 +22,9 @@ public class ARBookDebugProgressResetter : MonoBehaviour
     public string[] challengeIds =
     {
         "PikachuSequence",
-        "CelebiViewAlignment"
+        "CelebiViewAlignment",
+        "VolcanoSeal",
+        "LakePath"
     };
 
     private void Awake()

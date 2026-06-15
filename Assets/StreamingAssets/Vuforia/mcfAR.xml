@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <QCARConfig>
   <Tracking>
+    <ImageTarget name="chapter1" size="25.000000 25.000000" />
     <ImageTarget name="chapter3" size="25.000000 25.000000" />
     <ImageTarget name="chapter5" size="25.000000 25.000000" />
     <ImageTarget name="chapter2" size="25.000000 25.000000" />
     <ImageTarget name="chapter4" size="25.000000 25.000000" />
-    <ImageTarget name="chapter1" size="25.000000 25.000000" />
     <ImageTarget name="pokemonpage4" size="25.000000 35.350986" />
     <ImageTarget name="pokemonpage3" size="25.000000 35.350986" />
     <ImageTarget name="pokemonpage2" size="25.000000 35.350986" />
@@ -42,7 +42,5 @@
     <ImageTarget name="dragapult" size="25.000000 25.000000" />
     <ImageTarget name="celebi" size="25.000000 25.000000" />
     <ImageTarget name="butterfly" size="20.000000 18.971632" />
-    <ImageTarget name="3" size="25.000000 39.268959" />
-    <ImageTarget name="20251106231752_1" size="25.000000 14.062500" />
   </Tracking>
 </QCARConfig>

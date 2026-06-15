@@ -17,6 +17,14 @@ public class ARBookInteractable : MonoBehaviour
     public string captureId;
     [TextArea(2, 4)] public string captureDialogue;
     public UnityEvent onCaptured;
+    public bool useDefaultDialogue = true;
+    public UnityEvent onInteracted;
+    [Tooltip("有可见模型时，自动使用 3D 双角色对话。")]
+    public bool useCinematicDialogue = true;
+    [Tooltip("通常留空。自动识别错误时，拖入该角色的模型根物体。")]
+    public GameObject presentationModelRoot;
+    [Tooltip("可选。对话或战斗副本使用的动画控制器。")]
+    public RuntimeAnimatorController presentationAnimatorController;
 
     private int dialogueIndex;
 
@@ -51,6 +59,20 @@ public class ARBookInteractable : MonoBehaviour
             }
         }
 
+        Interacted?.Invoke(this);
+        onInteracted?.Invoke();
+
+        if (useCinematicDialogue &&
+            ARBookPresentationDirector.TryBeginDialogue(this))
+        {
+            return;
+        }
+
+        if (!useDefaultDialogue)
+        {
+            return;
+        }
+
         DialogueManager dialogueManager = DialogueManager.Instance;
         if (dialogueManager == null)
         {
@@ -63,11 +85,12 @@ public class ARBookInteractable : MonoBehaviour
             return;
         }
 
-        Interacted?.Invoke(this);
-        dialogueManager.ShowDialogueSequence(GetDisplayName(), GetDialogueSequence());
+        dialogueManager.ShowDialogueSequence(
+            GetDisplayName(),
+            ConsumeDialogueSequence());
     }
 
-    private string[] GetDialogueSequence()
+    public string[] ConsumeDialogueSequence()
     {
         if (dialogueFragments == null || dialogueFragments.Length == 0)
         {

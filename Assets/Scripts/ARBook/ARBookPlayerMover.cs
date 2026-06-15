@@ -19,15 +19,29 @@ public class ARBookPlayerMover : MonoBehaviour
     public GameObject visibleModel;
     public bool activateVisibleModelOnStart = true;
     public bool ignoreMoveRequestsWhileMoving;
+
+    [Header("Animation")]
+    public Animator characterAnimator;
+    public string walkingBoolParameter = "IsWalking";
+    public string greetingTriggerParameter = "Wave";
+    public string speedFloatParameter = "Speed";
+    public string turnFloatParameter = "Turn";
+    public string idleVariantIntParameter = "IdleVariant";
+    [Min(0.1f)] public float runSpeedThreshold = 3.5f;
+    [Min(1f)] public float idleVariantInterval = 5f;
+
     public NavMeshAgent navMeshAgent;
     public float navMeshSampleDistance = 3f;
+    [Min(0.01f)] public float targetVerticalTolerance = 0.75f;
 
     private Coroutine moveRoutine;
     private Quaternion modelFacingCorrection = Quaternion.identity;
+    private float nextIdleVariantTime;
 
     private void Awake()
     {
         ConfigureNavMeshAgent();
+        ResolveAnimator();
     }
 
     private void Start()
@@ -43,10 +57,20 @@ public class ARBookPlayerMover : MonoBehaviour
         }
 
         CacheModelFacingCorrection();
+        SetWalkingAnimation(false);
+        nextIdleVariantTime = Time.time + idleVariantInterval;
 
         if (snapToStartPointOnStart && startPoint != null)
         {
             SetPositionAtStartPoint();
+        }
+    }
+
+    private void Update()
+    {
+        if (!isMoving)
+        {
+            RandomizeIdleVariantIfNeeded(false);
         }
     }
 
@@ -65,6 +89,16 @@ public class ARBookPlayerMover : MonoBehaviour
         moveRoutine = StartCoroutine(MoveToSurfacePointRoutine(worldPoint));
     }
 
+    public void PlayGreeting()
+    {
+        SetAnimationTrigger(greetingTriggerParameter);
+    }
+
+    public void PlayAnimationTrigger(string parameterName)
+    {
+        SetAnimationTrigger(parameterName);
+    }
+
     public float GetDistanceTo(Vector3 worldPoint)
     {
         Transform movementSpace = GetMovementSpace();
@@ -80,8 +114,10 @@ public class ARBookPlayerMover : MonoBehaviour
     private IEnumerator MoveToSurfacePointRoutine(Vector3 worldPoint)
     {
         isMoving = true;
+        SetWalkingAnimation(true);
         yield return MoveWithNavMeshRoutine(worldPoint);
         isMoving = false;
+        SetWalkingAnimation(false);
         moveRoutine = null;
     }
 
@@ -111,7 +147,7 @@ public class ARBookPlayerMover : MonoBehaviour
         bool foundTarget = NavMesh.SamplePosition(
             worldPoint,
             out NavMeshHit targetHit,
-            sampleDistance,
+            Mathf.Min(sampleDistance, Mathf.Max(0.01f, targetVerticalTolerance)),
             areaMask);
 
         if (!foundTarget)
@@ -188,6 +224,7 @@ public class ARBookPlayerMover : MonoBehaviour
                 moveSpeed * Time.deltaTime);
 
             Vector3 moveDirection = nextPosition - currentPosition;
+            UpdateLocomotionParameters(moveDirection);
             if (rotateToMoveDirection && moveDirection.sqrMagnitude > 0.0001f)
             {
                 moveDirection.y = 0f;
@@ -271,6 +308,143 @@ public class ARBookPlayerMover : MonoBehaviour
         {
             transform.GetChild(0).gameObject.SetActive(true);
         }
+    }
+
+    private void ResolveAnimator()
+    {
+        if (characterAnimator != null)
+        {
+            return;
+        }
+
+        if (visibleModel != null)
+        {
+            characterAnimator = visibleModel.GetComponentInChildren<Animator>(true);
+        }
+
+        if (characterAnimator == null)
+        {
+            characterAnimator = GetComponentInChildren<Animator>(true);
+        }
+    }
+
+    private void SetWalkingAnimation(bool walking)
+    {
+        ResolveAnimator();
+        if (HasParameter(walkingBoolParameter, AnimatorControllerParameterType.Bool))
+        {
+            characterAnimator.SetBool(walkingBoolParameter, walking);
+        }
+
+        if (HasParameter(speedFloatParameter, AnimatorControllerParameterType.Float))
+        {
+            float normalizedSpeed = walking
+                ? Mathf.Clamp01(moveSpeed / Mathf.Max(0.1f, runSpeedThreshold))
+                : 0f;
+            characterAnimator.SetFloat(speedFloatParameter, normalizedSpeed);
+        }
+
+        if (!walking)
+        {
+            SetTurnParameter(0f);
+            RandomizeIdleVariantIfNeeded(true);
+        }
+    }
+
+    private void SetAnimationTrigger(string parameterName)
+    {
+        ResolveAnimator();
+        if (HasParameter(parameterName, AnimatorControllerParameterType.Trigger))
+        {
+            characterAnimator.SetTrigger(parameterName);
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"{name} animator has no Trigger parameter named '{parameterName}'.");
+        }
+    }
+
+    private bool HasParameter(
+        string parameterName,
+        AnimatorControllerParameterType parameterType)
+    {
+        if (characterAnimator == null ||
+            string.IsNullOrWhiteSpace(parameterName) ||
+            characterAnimator.runtimeAnimatorController == null)
+        {
+            return false;
+        }
+
+        AnimatorControllerParameter[] parameters = characterAnimator.parameters;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (parameters[i].name == parameterName &&
+                parameters[i].type == parameterType)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void UpdateLocomotionParameters(Vector3 moveDirection)
+    {
+        ResolveAnimator();
+        if (characterAnimator == null)
+        {
+            return;
+        }
+
+        if (HasParameter(speedFloatParameter, AnimatorControllerParameterType.Float))
+        {
+            float normalizedSpeed =
+                Mathf.Clamp01(moveSpeed / Mathf.Max(0.1f, runSpeedThreshold));
+            characterAnimator.SetFloat(speedFloatParameter, normalizedSpeed);
+        }
+
+        Vector3 flatDirection = moveDirection;
+        flatDirection.y = 0f;
+        if (flatDirection.sqrMagnitude > 0.0001f)
+        {
+            float signedAngle = Vector3.SignedAngle(
+                transform.forward,
+                flatDirection.normalized,
+                Vector3.up);
+            SetTurnParameter(Mathf.Clamp(signedAngle / 90f, -1f, 1f));
+        }
+
+        RandomizeIdleVariantIfNeeded(false);
+    }
+
+    private void SetTurnParameter(float value)
+    {
+        if (HasParameter(turnFloatParameter, AnimatorControllerParameterType.Float))
+        {
+            characterAnimator.SetFloat(turnFloatParameter, value);
+        }
+    }
+
+    private void RandomizeIdleVariantIfNeeded(bool forceSchedule)
+    {
+        if (!HasParameter(
+                idleVariantIntParameter,
+                AnimatorControllerParameterType.Int))
+        {
+            return;
+        }
+
+        if (!forceSchedule && Time.time < nextIdleVariantTime)
+        {
+            return;
+        }
+
+        characterAnimator.SetInteger(
+            idleVariantIntParameter,
+            Random.Range(0, 2));
+        nextIdleVariantTime =
+            Time.time + Mathf.Max(1f, idleVariantInterval);
     }
 
     private void ConfigureNavMeshAgent()

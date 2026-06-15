@@ -73,19 +73,43 @@ public class ARBookCaptureController : MonoBehaviour
             return;
         }
 
-        collectionManager.CaptureCreature(currentTarget.captureId);
-        currentTarget.isCaptured = true;
+        ARBookInteractable target = currentTarget;
+        ARBookPresentationDirector director =
+            ARBookPresentationDirector.Instance != null
+                ? ARBookPresentationDirector.Instance
+                : FindObjectOfType<ARBookPresentationDirector>(true);
+
+        if (director != null &&
+            director.BeginCaptureBattle(target, () => CompleteCapture(target)))
+        {
+            RefreshCaptureButton();
+            return;
+        }
+
+        Debug.LogWarning(
+            "没有可用的战斗演出系统，已直接执行收服。",
+            this);
+        CompleteCapture(target);
+    }
+
+    private void CompleteCapture(ARBookInteractable target)
+    {
+        if (target == null || collectionManager == null)
+        {
+            return;
+        }
+
+        collectionManager.CaptureCreature(target.captureId);
+        target.isCaptured = true;
 
         if (dialogueManager != null)
         {
-            dialogueManager.ShowDialogue(currentTarget.GetDisplayName(), currentTarget.captureDialogue);
-        }
-        else
-        {
-            Debug.LogWarning("ARBookCaptureController dialogueManager is not assigned.");
+            dialogueManager.ShowDialogue(
+                target.GetDisplayName(),
+                target.captureDialogue);
         }
 
-        currentTarget.onCaptured?.Invoke();
+        target.onCaptured?.Invoke();
         RefreshCaptureButton();
     }
 
