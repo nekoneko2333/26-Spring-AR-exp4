@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 public static class ARBookGameShellSetup
@@ -8,6 +9,17 @@ public static class ARBookGameShellSetup
 
     [MenuItem("ARBook/工具/创建或更新完整游戏UI外壳")]
     public static void CreateOrUpdateShell()
+    {
+        CreateOrUpdateShell(true);
+    }
+
+    [MenuItem("ARBook/工具/生成真实游戏UI外壳")]
+    public static void CreateOrUpdateRealSceneShell()
+    {
+        CreateOrUpdateShell(true);
+    }
+
+    private static void CreateOrUpdateShell(bool rebuildSceneUi)
     {
         GameObject shellObject = GameObject.Find(ShellName);
         if (shellObject == null)
@@ -35,8 +47,23 @@ public static class ARBookGameShellSetup
         }
 
         AutoBindCompanionAssets(controller);
+        if (rebuildSceneUi)
+        {
+            Undo.RegisterFullObjectHierarchyUndo(
+                shellObject,
+                "Rebuild ARBook Game Shell Scene UI");
+            controller.RebuildSceneInterface();
+            controller.BindSceneInterface();
+        }
+
         EditorUtility.SetDirty(controller);
         EditorUtility.SetDirty(shellObject);
+        if (controller.rootCanvas != null)
+        {
+            EditorUtility.SetDirty(controller.rootCanvas.gameObject);
+        }
+
+        EditorSceneManager.MarkSceneDirty(shellObject.scene);
         Debug.Log("ARBookGameShell 已创建/更新。运行游戏后会显示封面、常驻HUD、背包和陪伴模式。");
     }
 

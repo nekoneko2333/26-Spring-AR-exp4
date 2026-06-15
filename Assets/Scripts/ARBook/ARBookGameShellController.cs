@@ -45,22 +45,35 @@ public class ARBookGameShellController : MonoBehaviour
     public float companionSpacing = 0.85f;
     public Vector3 companionLocalOffset = new Vector3(0f, 0f, 1.2f);
 
+    [Header("Scene UI References")]
+    public RectTransform generatedRoot;
+    public RectTransform homeRoot;
+    public RectTransform hudRoot;
+    public RectTransform companionRoot;
+    public RectTransform companionGrid;
+    public RectTransform backpackRoot;
+    public TMP_Text startButtonText;
+    public TMP_Text questText;
+    public TMP_Text progressText;
+    public TMP_Text capturedCountText;
+    public TMP_Text companionDetailText;
+    public UIImage hpFill;
+    public Button startButton;
+    public Button restartButton;
+    public Button homeCompanionButton;
+    public Button backpackButton;
+    public Button hudCompanionButton;
+    public Button homeButton;
+    public Button placeButton;
+    public Button affectionButton;
+    public Button clearCompanionsButton;
+    public Button closeCompanionButton;
+    public Button closeBackpackButton;
+
     private const string StartedKey = "ARBookHasStarted";
     private const string CapturedIdsKey = "CapturedIds";
     private const string AffectionPrefix = "CompanionAffection_";
 
-    private RectTransform homeRoot;
-    private RectTransform hudRoot;
-    private RectTransform companionRoot;
-    private RectTransform companionGrid;
-    private RectTransform backpackRoot;
-    private RectTransform generatedRoot;
-    private TMP_Text startButtonText;
-    private TMP_Text questText;
-    private TMP_Text progressText;
-    private TMP_Text capturedCountText;
-    private TMP_Text companionDetailText;
-    private UIImage hpFill;
     private GameObject runtimeEventSystem;
 
     private readonly HashSet<string> selectedCompanionIds = new HashSet<string>();
@@ -85,7 +98,16 @@ public class ARBookGameShellController : MonoBehaviour
         ResolveReferences();
         EnsureCatalog();
         EnsureCanvas();
-        BuildInterface();
+        BindSceneInterface();
+        if (IsSceneInterfaceMissing())
+        {
+            RebuildSceneInterface();
+        }
+        else
+        {
+            WireSceneButtons();
+        }
+
         ApplyExistingUiTheme();
         HideLegacyHud();
     }
@@ -392,6 +414,14 @@ public class ARBookGameShellController : MonoBehaviour
         Stretch(generatedRoot, 0f, 0f, 0f, 0f);
     }
 
+    public void RebuildSceneInterface()
+    {
+        EnsureCanvas();
+        BuildInterface();
+        BindSceneInterface();
+        WireSceneButtons();
+    }
+
     private void BuildInterface()
     {
         ClearChildren(generatedRoot);
@@ -399,6 +429,82 @@ public class ARBookGameShellController : MonoBehaviour
         hudRoot = BuildHud();
         companionRoot = BuildCompanionOverlay();
         backpackRoot = BuildBackpackOverlay();
+    }
+
+    public void BindSceneInterface()
+    {
+        if (generatedRoot == null && rootCanvas != null)
+        {
+            Transform root = rootCanvas.transform.Find("ARBookGameShellGeneratedRoot");
+            generatedRoot = root != null ? root.GetComponent<RectTransform>() : null;
+        }
+
+        if (generatedRoot == null)
+        {
+            return;
+        }
+
+        homeRoot = FindRect(generatedRoot, "Home");
+        hudRoot = FindRect(generatedRoot, "HUD");
+        companionRoot = FindRect(generatedRoot, "CompanionMode");
+        backpackRoot = FindRect(generatedRoot, "Backpack");
+        companionGrid = FindRect(companionRoot, "CompanionGrid");
+        startButton = FindButton(homeRoot, "StartButton");
+        restartButton = FindButton(homeRoot, "RestartButton");
+        homeCompanionButton = FindButton(homeRoot, "CompanionButton");
+        backpackButton = FindButton(hudRoot, "BackpackButton");
+        hudCompanionButton = FindButton(hudRoot, "CompanionButton");
+        homeButton = FindButton(hudRoot, "HomeButton");
+        placeButton = FindButton(companionRoot, "PlaceButton");
+        affectionButton = FindButton(companionRoot, "AffectionButton");
+        clearCompanionsButton = FindButton(companionRoot, "ClearButton");
+        closeCompanionButton = FindButton(companionRoot, "CloseButton");
+        closeBackpackButton = FindButton(backpackRoot, "CloseButton");
+        startButtonText = startButton != null
+            ? startButton.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        questText = FindText(hudRoot, "QuestText");
+        progressText = FindText(hudRoot, "ProgressText");
+        capturedCountText = FindText(backpackRoot, "BackpackText");
+        companionDetailText = FindText(companionRoot, "DetailText");
+        hpFill = FindComponentInNamedChild<UIImage>(hudRoot, "HPFill");
+    }
+
+    private bool IsSceneInterfaceMissing()
+    {
+        return generatedRoot == null ||
+               homeRoot == null ||
+               hudRoot == null ||
+               companionRoot == null ||
+               backpackRoot == null ||
+               questText == null ||
+               progressText == null;
+    }
+
+    private void WireSceneButtons()
+    {
+        WireButton(startButton, BeginGame);
+        WireButton(restartButton, RestartGame);
+        WireButton(homeCompanionButton, OpenCompanionMode);
+        WireButton(backpackButton, OpenBackpack);
+        WireButton(hudCompanionButton, OpenCompanionMode);
+        WireButton(homeButton, ShowHome);
+        WireButton(placeButton, PlaceSelectedCompanions);
+        WireButton(affectionButton, AddAffectionToSelected);
+        WireButton(clearCompanionsButton, DespawnAllCompanions);
+        WireButton(closeCompanionButton, CloseCompanionMode);
+        WireButton(closeBackpackButton, CloseBackpack);
+    }
+
+    private static void WireButton(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.onClick.RemoveListener(action);
+        button.onClick.AddListener(action);
     }
 
     private RectTransform BuildHome()
@@ -436,15 +542,12 @@ public class ARBookGameShellController : MonoBehaviour
 
         Button startButton = CreateButton("StartButton", panel, "开始游戏", 32);
         startButtonText = startButton.GetComponentInChildren<TMP_Text>();
-        startButton.onClick.AddListener(BeginGame);
         SetLayout(startButton.GetComponent<RectTransform>(), 76f);
 
         Button restartButton = CreateButton("RestartButton", panel, "清空存档 / 重新开始", 28);
-        restartButton.onClick.AddListener(RestartGame);
         SetLayout(restartButton.GetComponent<RectTransform>(), 70f);
 
         Button companionButton = CreateButton("CompanionButton", panel, "陪伴模式", 28);
-        companionButton.onClick.AddListener(OpenCompanionMode);
         SetLayout(companionButton.GetComponent<RectTransform>(), 70f);
 
         TMP_Text footer = CreateText(
@@ -544,11 +647,8 @@ public class ARBookGameShellController : MonoBehaviour
         layout.childForceExpandWidth = true;
 
         Button backpackButton = CreateButton("BackpackButton", buttons, "背包", 24);
-        backpackButton.onClick.AddListener(OpenBackpack);
         Button companionButton = CreateButton("CompanionButton", buttons, "陪伴", 24);
-        companionButton.onClick.AddListener(OpenCompanionMode);
         Button homeButton = CreateButton("HomeButton", buttons, "首页", 24);
-        homeButton.onClick.AddListener(ShowHome);
 
         RectTransform hint = CreatePanel(
             "CameraHint",
@@ -631,13 +731,9 @@ public class ARBookGameShellController : MonoBehaviour
         layout.childForceExpandWidth = true;
 
         Button placeButton = CreateButton("PlaceButton", actions, "放置选中", 24);
-        placeButton.onClick.AddListener(PlaceSelectedCompanions);
         Button affectionButton = CreateButton("AffectionButton", actions, "互动 + 好感", 24);
-        affectionButton.onClick.AddListener(AddAffectionToSelected);
         Button clearButton = CreateButton("ClearButton", actions, "收回全部", 24);
-        clearButton.onClick.AddListener(DespawnAllCompanions);
         Button closeButton = CreateButton("CloseButton", actions, "返回", 24);
-        closeButton.onClick.AddListener(CloseCompanionMode);
 
         return root;
     }
@@ -675,7 +771,6 @@ public class ARBookGameShellController : MonoBehaviour
         SetLayout(capturedCountText.rectTransform, 300f);
 
         Button closeButton = CreateButton("CloseButton", panel, "关闭", 24);
-        closeButton.onClick.AddListener(CloseBackpack);
         SetLayout(closeButton.GetComponent<RectTransform>(), 70f);
 
         return root;
@@ -1350,6 +1445,52 @@ public class ARBookGameShellController : MonoBehaviour
     private bool IsChildOfRootCanvas(Transform target)
     {
         return generatedRoot != null && target.IsChildOf(generatedRoot);
+    }
+
+    private static RectTransform FindRect(Transform root, string name)
+    {
+        return FindComponentInNamedChild<RectTransform>(root, name);
+    }
+
+    private static Button FindButton(Transform root, string name)
+    {
+        return FindComponentInNamedChild<Button>(root, name);
+    }
+
+    private static TMP_Text FindText(Transform root, string name)
+    {
+        return FindComponentInNamedChild<TMP_Text>(root, name);
+    }
+
+    private static T FindComponentInNamedChild<T>(Transform root, string name)
+        where T : Component
+    {
+        Transform child = FindDescendant(root, name);
+        return child != null ? child.GetComponent<T>() : null;
+    }
+
+    private static Transform FindDescendant(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        if (root.name == name)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDescendant(root.GetChild(i), name);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private RectTransform CreateFullRoot(string name)

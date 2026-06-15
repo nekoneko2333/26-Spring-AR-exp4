@@ -6,7 +6,18 @@
 
 `ARBook > 工具 > 创建或更新完整游戏UI外壳`
 
-场景中会出现 `ARBookGameShell`。运行后会自动生成：
+场景中会出现 `ARBookGameShell`，并且菜单会直接生成真实的场景 UI：
+
+- `ARBookGameShellCanvas`
+- `ARBookGameShellGeneratedRoot`
+- `Home`
+- `HUD`
+- `Backpack`
+- `CompanionMode`
+
+这些都是 Hierarchy 里的真实 GameObject，可以直接调 `RectTransform`、`Image`、`TextMeshProUGUI`、`LayoutGroup` 等组件。运行时脚本只负责绑定按钮事件和刷新文本，不会每次重新临时生成整套外壳。
+
+这套真实 UI 包含：
 
 - 封面页
 - 开始游戏 / 继续游戏
@@ -52,6 +63,16 @@
 - 好感度保存在 `PlayerPrefs`，清空存档会一起清掉。
 
 如果自动匹配错了，再手动改对应条目的 `Portrait Texture`、`Companion Prefab` 或 `Scene Object`。
+
+## 调整真实 UI
+
+如果你已经手动调过 `Home`、`HUD`、`Backpack`、`CompanionMode` 的位置和样式，不要反复执行“创建或更新完整游戏UI外壳 / 生成真实游戏UI外壳”，因为这个菜单会重建 `ARBookGameShellGeneratedRoot` 下面的外壳 UI。
+
+正常调整流程：
+- 先执行一次菜单生成真实 UI。
+- 在 Hierarchy 里展开 `ARBookGameShellCanvas > ARBookGameShellGeneratedRoot`。
+- 直接调整里面的组件。
+- 之后只运行游戏测试，不需要再生成。
 
 ## 现有 UI
 
