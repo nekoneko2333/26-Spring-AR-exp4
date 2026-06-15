@@ -9,6 +9,8 @@ public class ARTapRaycaster : MonoBehaviour
     public float raycastDistance = 100f;
     public LayerMask raycastLayers = ~0;
     public float tapCooldown = 0.15f;
+    public bool tryAllEnabledCamerasOnMiss = true;
+    public float minimumRaycastDistance = 1000f;
     public bool interactImmediatelyOnModelTap;
     public bool enableSurfaceMovement;
     public LayerMask walkableSurfaceLayers;
@@ -94,14 +96,31 @@ public class ARTapRaycaster : MonoBehaviour
             return;
         }
 
+        Physics.SyncTransforms();
+
         Ray ray = mainCamera.ScreenPointToRay(screenPosition);
-        RaycastHit[] hits = Physics.RaycastAll(ray, raycastDistance, raycastLayers);
+        float distance = Mathf.Max(raycastDistance, minimumRaycastDistance);
+        RaycastHit[] hits = Physics.RaycastAll(ray, distance, raycastLayers);
+        Camera hitCamera = mainCamera;
+        if (hits.Length == 0 && tryAllEnabledCamerasOnMiss)
+        {
+            hits = RaycastWithFallbackCameras(
+                screenPosition,
+                mainCamera,
+                distance,
+                out hitCamera);
+        }
+
         if (hits.Length == 0)
         {
             if (debugMovementRaycasts)
             {
                 Debug.Log(
-                    $"Movement tap {screenPosition} hit no physics collider.",
+                    $"Movement tap {screenPosition} hit no physics collider. " +
+                    $"mainCamera='{mainCamera.name}', " +
+                    $"cameraPosition={mainCamera.transform.position}, " +
+                    $"rayOrigin={ray.origin}, rayDirection={ray.direction}, " +
+                    $"distance={distance}, raycastLayers={raycastLayers.value}.",
                     this);
             }
 
@@ -109,6 +128,14 @@ public class ARTapRaycaster : MonoBehaviour
         }
 
         Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+        if (debugMovementRaycasts && hitCamera != mainCamera)
+        {
+            Debug.Log(
+                $"Movement tap {screenPosition} missed Camera.main " +
+                $"'{mainCamera.name}' but hit using camera '{hitCamera.name}'.",
+                this);
+        }
+
         LogHitDetails(screenPosition, hits);
 
         for (int i = 0; i < hits.Length; i++)
@@ -176,6 +203,37 @@ public class ARTapRaycaster : MonoBehaviour
     private bool IsLayerInMask(int layer, LayerMask layerMask)
     {
         return (layerMask.value & (1 << layer)) != 0;
+    }
+
+    private RaycastHit[] RaycastWithFallbackCameras(
+        Vector2 screenPosition,
+        Camera mainCamera,
+        float distance,
+        out Camera hitCamera)
+    {
+        hitCamera = mainCamera;
+        Camera[] cameras = Camera.allCameras;
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            Camera camera = cameras[i];
+            if (camera == null ||
+                camera == mainCamera ||
+                !camera.enabled ||
+                !camera.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, distance, raycastLayers);
+            if (hits.Length > 0)
+            {
+                hitCamera = camera;
+                return hits;
+            }
+        }
+
+        return Array.Empty<RaycastHit>();
     }
 
     private ARBookPlayerMover FindPlayerMoverForSurface(Transform surface)
@@ -282,10 +340,10 @@ public class ARTapRaycaster : MonoBehaviour
 
     private void HandleMoveFinished(bool reachedTarget)
     {
-        DestroyMoveTargetEffect();
+        DestroyMoveTargetEffect(false);
     }
 
-    private void DestroyMoveTargetEffect()
+    private void DestroyMoveTargetEffect(bool immediate)
     {
         if (moveTargetEffectInstance == null)
         {
@@ -299,14 +357,22 @@ public class ARTapRaycaster : MonoBehaviour
             particles[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
-        Destroy(moveTargetEffectInstance);
+        if (immediate || !Application.isPlaying)
+        {
+            DestroyImmediate(moveTargetEffectInstance);
+        }
+        else
+        {
+            Destroy(moveTargetEffectInstance);
+        }
+
         moveTargetEffectInstance = null;
     }
 
     private void OnDestroy()
     {
         ObserveMover(null);
-        DestroyMoveTargetEffect();
+        DestroyMoveTargetEffect(true);
     }
 
     private void LogHitDetails(Vector2 screenPosition, RaycastHit[] hits)

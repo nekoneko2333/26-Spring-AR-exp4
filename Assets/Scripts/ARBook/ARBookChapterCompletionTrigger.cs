@@ -4,9 +4,13 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
 {
     public int chapterId = 1;
     public string requiredCaptureId = "Pikachu";
+    public bool requireCompletedChapters;
     public int[] requiredCompletedChapterIds;
     public ARBookConditionGroup extraConditions = new ARBookConditionGroup();
-    public string completeDialogue = "Chapter 1 is complete. Open Chapter 2.";
+    public string completeDialogue = "地图探索完成。可以继续翻开任意地图。";
+    public bool useIndependentMapCompleteDialogue = true;
+    public string independentMapCompleteDialogueFormat =
+        "地图 {0} 探索完成。可以继续翻开任意地图。";
     public ARBookCollectionManager collectionManager;
     public ARBookChapterProgress chapterProgress;
     public ARBookQuestTracker questTracker;
@@ -91,7 +95,9 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
         }
 
         PlayTransitionEffect();
-        chapterProgress.CompleteChapterWithMemoryFragment(chapterId, completeDialogue);
+        chapterProgress.CompleteChapterWithMemoryFragment(
+            chapterId,
+            GetCompleteDialogue());
 
         if (questTracker != null && questTracker.chapterId == chapterId)
         {
@@ -99,8 +105,24 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
         }
     }
 
+    private string GetCompleteDialogue()
+    {
+        if (useIndependentMapCompleteDialogue &&
+            !string.IsNullOrWhiteSpace(independentMapCompleteDialogueFormat))
+        {
+            return string.Format(independentMapCompleteDialogueFormat, chapterId);
+        }
+
+        return completeDialogue;
+    }
+
     private bool HasRequiredChaptersCompleted()
     {
+        if (!requireCompletedChapters)
+        {
+            return true;
+        }
+
         if (requiredCompletedChapterIds == null || requiredCompletedChapterIds.Length == 0)
         {
             return true;

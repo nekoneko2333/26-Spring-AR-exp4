@@ -767,6 +767,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
       insertIndex: -1
       addedObject: {fileID: 15447952}
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 15447953}
   m_SourcePrefab: {fileID: -5645937942226959685, guid: d3eb9994516cf594486e888293627114, type: 3}
 --- !u!4 &15447950 stripped
 Transform:
@@ -792,6 +795,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   challenge: {fileID: 1812095336}
   stepIndex: 2
+--- !u!64 &15447953
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 15447951}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
 --- !u!1 &16605183 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4719157437057402800, guid: 86289a920f91bcd4da54bcc1e18b1ed3, type: 3}
@@ -14977,13 +15002,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 423119614}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0.29395735, z: -0, w: 0.9558186}
-  m_LocalPosition: {x: 9.583985, y: 24.82597, z: -5.6486826}
+  m_LocalRotation: {x: -0, y: -0.6925517, z: -0, w: 0.7213684}
+  m_LocalPosition: {x: 9.583985, y: 24.82597, z: -8.830001}
   m_LocalScale: {x: 3.067399, y: 0.40803474, z: 4.07544}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2081587961}
-  m_LocalEulerAnglesHint: {x: 0, y: -34.19, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -87.665, z: 0}
 --- !u!65 &423119616
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -24446,6 +24471,168 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -7985511403912185460, guid: 1f8775ce35485f64483fabe2655880ab, type: 3}
+--- !u!1 &530659632
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 530659634}
+  - component: {fileID: 530659633}
+  m_Layer: 0
+  m_Name: ARBookGameShell
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &530659633
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 530659632}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21b5650451586634eb8b20e6fc8426d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  collectionManager: {fileID: 1980180828}
+  chapterProgress: {fileID: 1980180826}
+  progressResetter: {fileID: 1980180834}
+  chapterHudController: {fileID: 1980180835}
+  companions:
+  - captureId: Bulbasaur
+    displayName: "\u5999\u86D9\u79CD\u5B50"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Talonflame
+    displayName: "\u70C8\u7BAD\u9E70"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Axew
+    displayName: "\u7259\u7259"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Pikachu
+    displayName: "\u76AE\u5361\u4E18"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Meowth
+    displayName: "\u55B5\u55B5"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Infernape
+    displayName: "\u70C8\u7130\u7334"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Squirtle
+    displayName: "\u6770\u5C3C\u9F9F"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Jirachi
+    displayName: "\u57FA\u62C9\u7948"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Sneasler
+    displayName: "\u72C3\u62C9"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Zorua
+    displayName: "\u7D22\u7F57\u4E9A"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Zekrom
+    displayName: "\u6377\u514B\u7F57\u59C6"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Zygarde10
+    displayName: "\u57FA\u683C\u5C14\u5FB710%\u5F62\u6001"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Toxtricity
+    displayName: "\u98A4\u5F26\u877E\u8788"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Scizor
+    displayName: "\u5DE8\u94B3\u87B3\u8782"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Mismagius
+    displayName: "\u68A6\u5996\u9B54"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Mew
+    displayName: "\u68A6\u5E7B"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Manaphy
+    displayName: "\u739B\u7EB3\u970F"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: ElectrodeHisuian
+    displayName: "\u9739\u96F3\u7535\u7403\uFF08\u6D17\u7FE0\u7684\u6837\u5B50\uFF09"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Dragapult
+    displayName: "\u591A\u9F99\u5DF4\u9C81\u6258"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  - captureId: Celebi
+    displayName: "\u65F6\u62C9\u6BD4"
+    portrait: {fileID: 0}
+    companionPrefab: {fileID: 0}
+    sceneObject: {fileID: 0}
+  chineseFont: {fileID: 11400000, guid: 9521e1541679a384b81d88ae2217e3b7, type: 2}
+  playerAvatarSprite: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
+  playerName: "\u8BAD\u7EC3\u5BB6"
+  maxHP: 100
+  currentHP: 100
+  showCoverOnStart: 1
+  hideLegacyChapterHudTexts: 1
+  themeExistingUiOnStart: 1
+  rootCanvas: {fileID: 0}
+  companionPlacementRoot: {fileID: 881581455}
+  maxActiveCompanions: 3
+  companionSpacing: 0.85
+  companionLocalOffset: {x: 0, y: 0, z: 1.2}
+--- !u!4 &530659634
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 530659632}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &531354551 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6538139788625715876, guid: 1f8775ce35485f64483fabe2655880ab, type: 3}
@@ -37550,6 +37737,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
       insertIndex: -1
       addedObject: {fileID: 859473637}
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 859473638}
   m_SourcePrefab: {fileID: -5645937942226959685, guid: d3eb9994516cf594486e888293627114, type: 3}
 --- !u!4 &859473635 stripped
 Transform:
@@ -37575,6 +37765,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   challenge: {fileID: 1812095336}
   stepIndex: 0
+--- !u!64 &859473638
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 859473636}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
 --- !u!1 &859562728 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 908667030795160506, guid: 7b03709baf22e7849ac91bb3c5c2b60e, type: 3}
@@ -61763,6 +61975,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1447345563}
+    - targetCorrespondingSourceObject: {fileID: -6689036041284674117, guid: d3eb9994516cf594486e888293627114, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1447345564}
   m_SourcePrefab: {fileID: -5645937942226959685, guid: d3eb9994516cf594486e888293627114, type: 3}
 --- !u!4 &1447345561 stripped
 Transform:
@@ -61788,6 +62003,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   challenge: {fileID: 1812095336}
   stepIndex: 1
+--- !u!64 &1447345564
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1447345562}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
 --- !u!1 &1447596293 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -3090695905948241511, guid: 7b03709baf22e7849ac91bb3c5c2b60e, type: 3}
@@ -87524,11 +87761,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapterId: 1
   requiredCaptureId: Pikachu
+  requireCompletedChapters: 0
   requiredCompletedChapterIds: 
   extraConditions:
     matchMode: 0
     conditions: []
   completeDialogue: Chapter 1 is complete. Open Chapter 2.
+  useIndependentMapCompleteDialogue: 1
+  independentMapCompleteDialogueFormat: "\u5730\u56FE {0} \u63A2\u7D22\u5B8C\u6210\u3002\u53EF\u4EE5\u7EE7\u7EED\u7FFB\u5F00\u4EFB\u610F\u5730\u56FE\u3002"
   collectionManager: {fileID: 1980180828}
   chapterProgress: {fileID: 1980180826}
   questTracker: {fileID: 0}
@@ -87552,11 +87792,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapterId: 2
   requiredCaptureId: Celebi
+  requireCompletedChapters: 0
   requiredCompletedChapterIds: 
   extraConditions:
     matchMode: 0
     conditions: []
   completeDialogue: Chapter 2 is complete. Open Chapter 3.
+  useIndependentMapCompleteDialogue: 1
+  independentMapCompleteDialogueFormat: "\u5730\u56FE {0} \u63A2\u7D22\u5B8C\u6210\u3002\u53EF\u4EE5\u7EE7\u7EED\u7FFB\u5F00\u4EFB\u610F\u5730\u56FE\u3002"
   collectionManager: {fileID: 1980180828}
   chapterProgress: {fileID: 1980180826}
   questTracker: {fileID: 0}
@@ -87580,11 +87823,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapterId: 3
   requiredCaptureId: Infernape
+  requireCompletedChapters: 0
   requiredCompletedChapterIds: 
   extraConditions:
     matchMode: 0
     conditions: []
   completeDialogue: Chapter 3 is complete. Open Chapter 4.
+  useIndependentMapCompleteDialogue: 1
+  independentMapCompleteDialogueFormat: "\u5730\u56FE {0} \u63A2\u7D22\u5B8C\u6210\u3002\u53EF\u4EE5\u7EE7\u7EED\u7FFB\u5F00\u4EFB\u610F\u5730\u56FE\u3002"
   collectionManager: {fileID: 1980180828}
   chapterProgress: {fileID: 1980180826}
   questTracker: {fileID: 0}
@@ -87608,11 +87854,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapterId: 5
   requiredCaptureId: Zekrom
+  requireCompletedChapters: 0
   requiredCompletedChapterIds: 01000000020000000300000004000000
   extraConditions:
     matchMode: 0
     conditions: []
   completeDialogue: Adventure Complete.
+  useIndependentMapCompleteDialogue: 1
+  independentMapCompleteDialogueFormat: "\u5730\u56FE {0} \u63A2\u7D22\u5B8C\u6210\u3002\u53EF\u4EE5\u7EE7\u7EED\u7FFB\u5F00\u4EFB\u610F\u5730\u56FE\u3002"
   collectionManager: {fileID: 1980180828}
   chapterProgress: {fileID: 1980180826}
   questTracker: {fileID: 0}
@@ -87636,11 +87885,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapterId: 4
   requiredCaptureId: Manaphy
+  requireCompletedChapters: 0
   requiredCompletedChapterIds: 
   extraConditions:
     matchMode: 0
     conditions: []
   completeDialogue: Chapter 4 is complete. Open Chapter 5.
+  useIndependentMapCompleteDialogue: 1
+  independentMapCompleteDialogueFormat: "\u5730\u56FE {0} \u63A2\u7D22\u5B8C\u6210\u3002\u53EF\u4EE5\u7EE7\u7EED\u7FFB\u5F00\u4EFB\u610F\u5730\u56FE\u3002"
   collectionManager: {fileID: 1980180828}
   chapterProgress: {fileID: 1980180826}
   questTracker: {fileID: 0}
@@ -90937,7 +91189,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: f0eb6b92403d27548b888a24d3e3aab4, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -4.6
+      value: -6.796
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: f0eb6b92403d27548b888a24d3e3aab4, type: 3}
       propertyPath: m_LocalRotation.w
@@ -95865,6 +96117,7 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1980180822}
+  - {fileID: 530659634}
   - {fileID: 981252302}
   - {fileID: 1218658618}
   - {fileID: 1151325185}

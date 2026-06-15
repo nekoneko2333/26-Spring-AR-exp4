@@ -3,7 +3,7 @@ using UnityEngine;
 public class ARBookChapterProgress : MonoBehaviour
 {
     public DialogueManager dialogueManager;
-    public string chapter01CompleteDialogue = "Chapter 1 is complete. Open Chapter 2.";
+    public string chapter01CompleteDialogue = "地图 1 探索完成。可以继续翻开任意地图。";
 
     private const string ChapterCompletedKeyPrefix = "ChapterCompleted_";
     private const string MemoryFragmentKeyPrefix = "MemoryFragment_";
