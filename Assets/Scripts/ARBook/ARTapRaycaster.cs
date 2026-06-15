@@ -13,6 +13,8 @@ public class ARTapRaycaster : MonoBehaviour
     public bool enableSurfaceMovement;
     public LayerMask walkableSurfaceLayers;
     public bool debugMovementRaycasts = true;
+    public bool debugMovementHitDetails;
+    [Range(1, 12)] public int debugHitDetailLimit = 6;
 
     [Header("Move Target Effect")]
     [Tooltip("循环粒子预制体。有效点击后显示，角色到达或移动失败时自动隐藏。")]
@@ -21,6 +23,7 @@ public class ARTapRaycaster : MonoBehaviour
     public Vector3 moveTargetEffectOffset = new Vector3(0f, 0.02f, 0f);
     [Tooltip("自动使用当前人物 NavMeshAgent 的直径作为粒子世界缩放。")]
     public bool scaleEffectToPlayerDiameter = true;
+    public bool showMoveTargetEffectAtTappedSurface = true;
     [Tooltip("人物直径的倍率。1 表示与人物寻路直径相同。")]
     [Range(0.5f, 2f)] public float playerDiameterScaleMultiplier = 1f;
     [Tooltip("关闭自动人物直径后使用的世界缩放。")]
@@ -31,6 +34,7 @@ public class ARTapRaycaster : MonoBehaviour
     private GameObject moveTargetEffectInstance;
     private ARBookPlayerMover observedMover;
     private Vector3 pendingSurfaceNormal = Vector3.up;
+    private Vector3 pendingSurfacePoint;
 
     private void Update()
     {
@@ -105,6 +109,7 @@ public class ARTapRaycaster : MonoBehaviour
         }
 
         Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+        LogHitDetails(screenPosition, hits);
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -145,6 +150,7 @@ public class ARTapRaycaster : MonoBehaviour
             {
                 ObserveMover(mover);
                 pendingSurfaceNormal = hits[i].normal;
+                pendingSurfacePoint = hits[i].point;
                 mover.MoveToSurfacePoint(hits[i].point);
             }
             else if (debugMovementRaycasts)
@@ -233,8 +239,11 @@ public class ARTapRaycaster : MonoBehaviour
                 moveTargetEffectRoot);
         }
 
+        Vector3 effectPosition = showMoveTargetEffectAtTappedSurface
+            ? pendingSurfacePoint
+            : worldPosition;
         moveTargetEffectInstance.transform.position =
-            worldPosition + moveTargetEffectOffset;
+            effectPosition + moveTargetEffectOffset;
         float targetScale = Mathf.Clamp(
             moveTargetEffectScale,
             0.1f,
@@ -273,10 +282,10 @@ public class ARTapRaycaster : MonoBehaviour
 
     private void HandleMoveFinished(bool reachedTarget)
     {
-        HideMoveTargetEffect();
+        DestroyMoveTargetEffect();
     }
 
-    private void HideMoveTargetEffect()
+    private void DestroyMoveTargetEffect()
     {
         if (moveTargetEffectInstance == null)
         {
@@ -290,12 +299,45 @@ public class ARTapRaycaster : MonoBehaviour
             particles[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
-        moveTargetEffectInstance.SetActive(false);
+        Destroy(moveTargetEffectInstance);
+        moveTargetEffectInstance = null;
     }
 
     private void OnDestroy()
     {
         ObserveMover(null);
+        DestroyMoveTargetEffect();
+    }
+
+    private void LogHitDetails(Vector2 screenPosition, RaycastHit[] hits)
+    {
+        if (!debugMovementRaycasts || !debugMovementHitDetails)
+        {
+            return;
+        }
+
+        int count = Mathf.Min(
+            hits.Length,
+            Mathf.Max(1, debugHitDetailLimit));
+        string message =
+            $"Movement tap {screenPosition} hit {hits.Length} collider(s).";
+        for (int i = 0; i < count; i++)
+        {
+            Collider hitCollider = hits[i].collider;
+            GameObject hitObject = hitCollider != null
+                ? hitCollider.gameObject
+                : null;
+            int layer = hitObject != null ? hitObject.layer : -1;
+            bool walkable = hitObject != null &&
+                IsLayerInMask(layer, walkableSurfaceLayers);
+            message +=
+                $"\n  #{i}: name='{(hitCollider != null ? hitCollider.name : "null")}', " +
+                $"layer={layer}, walkable={walkable}, " +
+                $"distance={hits[i].distance:F3}, point={hits[i].point}, " +
+                $"normal={hits[i].normal}";
+        }
+
+        Debug.Log(message, this);
     }
 
     private bool IsPointerOverInteractiveUI(Vector2 screenPosition)
