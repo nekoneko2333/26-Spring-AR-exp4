@@ -1,4 +1,5 @@
 using System.Collections;
+using System;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Serialization;
@@ -25,18 +26,20 @@ public class ARBookPlayerMover : MonoBehaviour
     public string walkingBoolParameter = "IsWalking";
     public string greetingTriggerParameter = "Wave";
     public string speedFloatParameter = "Speed";
-    public string turnFloatParameter = "Turn";
-    public string idleVariantIntParameter = "IdleVariant";
-    [Min(0.1f)] public float runSpeedThreshold = 3.5f;
-    [Min(1f)] public float idleVariantInterval = 5f;
+    [Range(0.1f, 0.7f)] public float walkingAnimatorSpeed = 0.5f;
 
     public NavMeshAgent navMeshAgent;
     public float navMeshSampleDistance = 3f;
     [Min(0.01f)] public float targetVerticalTolerance = 0.75f;
+    public bool useTargetSampleFallback = true;
+    [Min(0.01f)] public float targetFallbackSampleDistance = 3f;
+    public bool debugMovement = true;
 
     private Coroutine moveRoutine;
     private Quaternion modelFacingCorrection = Quaternion.identity;
-    private float nextIdleVariantTime;
+
+    public event Action<Vector3> MoveTargetAccepted;
+    public event Action<bool> MoveFinished;
 
     private void Awake()
     {
@@ -58,19 +61,10 @@ public class ARBookPlayerMover : MonoBehaviour
 
         CacheModelFacingCorrection();
         SetWalkingAnimation(false);
-        nextIdleVariantTime = Time.time + idleVariantInterval;
 
         if (snapToStartPointOnStart && startPoint != null)
         {
             SetPositionAtStartPoint();
-        }
-    }
-
-    private void Update()
-    {
-        if (!isMoving)
-        {
-            RandomizeIdleVariantIfNeeded(false);
         }
     }
 
@@ -84,6 +78,7 @@ public class ARBookPlayerMover : MonoBehaviour
         if (moveRoutine != null)
         {
             StopCoroutine(moveRoutine);
+            MoveFinished?.Invoke(false);
         }
 
         moveRoutine = StartCoroutine(MoveToSurfacePointRoutine(worldPoint));
@@ -97,6 +92,28 @@ public class ARBookPlayerMover : MonoBehaviour
     public void PlayAnimationTrigger(string parameterName)
     {
         SetAnimationTrigger(parameterName);
+    }
+
+    public void RestoreControlAfterPresentation()
+    {
+        if (moveRoutine != null)
+        {
+            StopCoroutine(moveRoutine);
+            moveRoutine = null;
+            MoveFinished?.Invoke(false);
+        }
+
+        enabled = true;
+        isMoving = false;
+        ConfigureNavMeshAgent();
+        ActivateVisibleModel();
+        ResolveAnimator();
+        if (characterAnimator != null)
+        {
+            characterAnimator.applyRootMotion = false;
+        }
+
+        SetWalkingAnimation(false);
     }
 
     public float GetDistanceTo(Vector3 worldPoint)
@@ -128,6 +145,7 @@ public class ARBookPlayerMover : MonoBehaviour
         if (navMeshAgent == null)
         {
             Debug.LogWarning("NavMesh movement requires a NavMeshAgent.");
+            MoveFinished?.Invoke(false);
             yield break;
         }
 
@@ -150,29 +168,75 @@ public class ARBookPlayerMover : MonoBehaviour
             Mathf.Min(sampleDistance, Mathf.Max(0.01f, targetVerticalTolerance)),
             areaMask);
 
+        if (!foundTarget && useTargetSampleFallback)
+        {
+            foundTarget = NavMesh.SamplePosition(
+                worldPoint,
+                out targetHit,
+                Mathf.Max(
+                    targetVerticalTolerance,
+                    targetFallbackSampleDistance),
+                areaMask);
+        }
+
         if (!foundTarget)
         {
             Debug.LogWarning(
                 $"{name} could not find NavMesh near the tapped point {worldPoint}.");
+            MoveFinished?.Invoke(false);
             yield break;
+        }
+
+        if (debugMovement)
+        {
+            Debug.Log(
+                $"{name} movement target: tap={worldPoint}, " +
+                $"navMesh={targetHit.position}, " +
+                $"projectionDistance={Vector3.Distance(worldPoint, targetHit.position):F3}.",
+                this);
         }
 
         if (!foundStart)
         {
             Debug.LogWarning(
                 $"{name} is outside the baked NavMesh. Moving directly to the nearest valid point.");
+            MoveTargetAccepted?.Invoke(targetHit.position);
             yield return MoveToWorldPositionRoutine(targetHit.position);
+            MoveFinished?.Invoke(true);
             yield break;
         }
 
         NavMeshPath path = new NavMeshPath();
-        if (!NavMesh.CalculatePath(startHit.position, targetHit.position, filter, path) ||
-            path.status != NavMeshPathStatus.PathComplete ||
-            path.corners.Length < 2)
+        bool calculated =
+            NavMesh.CalculatePath(
+                startHit.position,
+                targetHit.position,
+                filter,
+                path);
+        if (!calculated || path.status != NavMeshPathStatus.PathComplete)
         {
             Debug.LogWarning(
-                $"{name} could not calculate a complete NavMesh path. Moving directly to the valid point.");
+                $"{name} could not calculate a complete NavMesh path. " +
+                $"calculated={calculated}, status={path.status}, " +
+                $"corners={path.corners.Length}.",
+                this);
+            MoveFinished?.Invoke(false);
+            yield break;
+        }
+
+        MoveTargetAccepted?.Invoke(targetHit.position);
+
+        if (debugMovement)
+        {
+            Debug.Log(
+                $"{name} accepted path with {path.corners.Length} corners.",
+                this);
+        }
+
+        if (path.corners.Length < 2)
+        {
             yield return MoveToWorldPositionRoutine(targetHit.position);
+            MoveFinished?.Invoke(true);
             yield break;
         }
 
@@ -191,6 +255,8 @@ public class ARBookPlayerMover : MonoBehaviour
 
             yield return MoveToLocalPositionRoutine(localCorner);
         }
+
+        MoveFinished?.Invoke(true);
     }
 
     private IEnumerator MoveToWorldPositionRoutine(Vector3 worldPosition)
@@ -224,7 +290,6 @@ public class ARBookPlayerMover : MonoBehaviour
                 moveSpeed * Time.deltaTime);
 
             Vector3 moveDirection = nextPosition - currentPosition;
-            UpdateLocomotionParameters(moveDirection);
             if (rotateToMoveDirection && moveDirection.sqrMagnitude > 0.0001f)
             {
                 moveDirection.y = 0f;
@@ -338,16 +403,9 @@ public class ARBookPlayerMover : MonoBehaviour
 
         if (HasParameter(speedFloatParameter, AnimatorControllerParameterType.Float))
         {
-            float normalizedSpeed = walking
-                ? Mathf.Clamp01(moveSpeed / Mathf.Max(0.1f, runSpeedThreshold))
-                : 0f;
-            characterAnimator.SetFloat(speedFloatParameter, normalizedSpeed);
-        }
-
-        if (!walking)
-        {
-            SetTurnParameter(0f);
-            RandomizeIdleVariantIfNeeded(true);
+            characterAnimator.SetFloat(
+                speedFloatParameter,
+                walking ? walkingAnimatorSpeed : 0f);
         }
     }
 
@@ -387,64 +445,6 @@ public class ARBookPlayerMover : MonoBehaviour
         }
 
         return false;
-    }
-
-    private void UpdateLocomotionParameters(Vector3 moveDirection)
-    {
-        ResolveAnimator();
-        if (characterAnimator == null)
-        {
-            return;
-        }
-
-        if (HasParameter(speedFloatParameter, AnimatorControllerParameterType.Float))
-        {
-            float normalizedSpeed =
-                Mathf.Clamp01(moveSpeed / Mathf.Max(0.1f, runSpeedThreshold));
-            characterAnimator.SetFloat(speedFloatParameter, normalizedSpeed);
-        }
-
-        Vector3 flatDirection = moveDirection;
-        flatDirection.y = 0f;
-        if (flatDirection.sqrMagnitude > 0.0001f)
-        {
-            float signedAngle = Vector3.SignedAngle(
-                transform.forward,
-                flatDirection.normalized,
-                Vector3.up);
-            SetTurnParameter(Mathf.Clamp(signedAngle / 90f, -1f, 1f));
-        }
-
-        RandomizeIdleVariantIfNeeded(false);
-    }
-
-    private void SetTurnParameter(float value)
-    {
-        if (HasParameter(turnFloatParameter, AnimatorControllerParameterType.Float))
-        {
-            characterAnimator.SetFloat(turnFloatParameter, value);
-        }
-    }
-
-    private void RandomizeIdleVariantIfNeeded(bool forceSchedule)
-    {
-        if (!HasParameter(
-                idleVariantIntParameter,
-                AnimatorControllerParameterType.Int))
-        {
-            return;
-        }
-
-        if (!forceSchedule && Time.time < nextIdleVariantTime)
-        {
-            return;
-        }
-
-        characterAnimator.SetInteger(
-            idleVariantIntParameter,
-            Random.Range(0, 2));
-        nextIdleVariantTime =
-            Time.time + Mathf.Max(1f, idleVariantInterval);
     }
 
     private void ConfigureNavMeshAgent()

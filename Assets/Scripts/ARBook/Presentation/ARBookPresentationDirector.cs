@@ -19,12 +19,12 @@ public class ARBookPresentationDirector : MonoBehaviour
     public Transform dialogueRightAnchor;
 
     [Header("Automatic Model Size")]
-    [Min(0.1f)] public float battleOpponentHeight = 2.2f;
-    [Min(0.1f)] public float battlePlayerHeight = 2.4f;
+    [Min(0.1f)] public float battleOpponentHeight = 1.35f;
+    [Min(0.1f)] public float battlePlayerHeight = 4.2f;
     [Min(0.1f)] public float dialogueActorHeight = 3.6f;
     public bool useUnlitBattleMaterials = true;
     public bool useUnlitDialogueMaterials = true;
-    public float battleOpponentYawCorrection = 180f;
+    public float battleOpponentYawCorrection;
     public float battlePlayerYawCorrection = 150f;
 
     [Header("Animator Overrides")]
@@ -197,6 +197,7 @@ public class ARBookPresentationDirector : MonoBehaviour
             EnsureActor(battleOpponentClone);
         ARBookPresentationActor playerActor =
             EnsureActor(battlePlayerClone);
+        opponentActor.holdCurrentAnimation = interactable.keepBattleIdle;
         ApplyAnimatorController(
             opponentActor,
             interactable.presentationAnimatorController);
@@ -241,10 +242,22 @@ public class ARBookPresentationDirector : MonoBehaviour
             battleController != null ? battleController.session : null,
             ref battleOriginalHideList);
         CleanupBattleModels();
+        RestoreActivePlayerControl();
 
         if (playerWon)
         {
-            victoryCallback?.Invoke();
+            try
+            {
+                victoryCallback?.Invoke();
+            }
+            finally
+            {
+                RestoreActivePlayerControl();
+            }
+        }
+        else
+        {
+            RestoreActivePlayerControl();
         }
     }
 
@@ -713,6 +726,22 @@ public class ARBookPresentationDirector : MonoBehaviour
     {
         DestroyClone(ref dialogueLeftClone);
         DestroyClone(ref dialogueRightClone);
+    }
+
+    private static void RestoreActivePlayerControl()
+    {
+        ARBookPlayerMover[] movers =
+            FindObjectsOfType<ARBookPlayerMover>(true);
+        for (int i = 0; i < movers.Length; i++)
+        {
+            ARBookPlayerMover mover = movers[i];
+            if (mover == null || !mover.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            mover.RestoreControlAfterPresentation();
+        }
     }
 
     private static void DestroyClone(ref GameObject clone)

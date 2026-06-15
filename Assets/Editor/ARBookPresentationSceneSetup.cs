@@ -16,6 +16,10 @@ public static class ARBookPresentationSceneSetup
         "Assets/Materials/ARBookPresentationBackground.mat";
     private const string ChineseFontPath =
         "Assets/Fonts/SimplifiedChinese/SourceHanSansSC-Normal SDF.asset";
+    private const string PlayerControllerPath =
+        "Assets/Animations/Hilda_Regular_00.controller";
+    private const string PlayerCinematicControllerPath =
+        "Assets/Animations/Hilda_Regular_00_Cinematic.controller";
 
     [InitializeOnLoadMethod]
     private static void ScheduleFirstSetup()
@@ -79,9 +83,9 @@ public static class ARBookPresentationSceneSetup
             EnsureChild(battleStage.transform, "RightTrainerAnchor");
         leftCreature.SetActive(true);
         rightTrainer.SetActive(true);
-        leftCreature.transform.localPosition = new Vector3(-1.5f, 0f, 0f);
+        leftCreature.transform.localPosition = new Vector3(-1.7f, 0.05f, 2.8f);
         rightTrainer.transform.localPosition =
-            new Vector3(1.85f, 0f, 0.15f);
+            new Vector3(3.05f, -1.25f, -1.15f);
         leftCreature.transform.localRotation = Quaternion.Euler(0f, 25f, 0f);
         rightTrainer.transform.localRotation = Quaternion.Euler(0f, -25f, 0f);
 
@@ -243,11 +247,15 @@ public static class ARBookPresentationSceneSetup
         director.battlePlayerAnchor = rightTrainer.transform;
         director.dialogueLeftAnchor = leftDialogue.transform;
         director.dialogueRightAnchor = rightDialogue.transform;
+        director.battleOpponentHeight = 1.35f;
+        director.battlePlayerHeight = 4.2f;
         director.dialogueActorHeight = 3.6f;
         director.useUnlitBattleMaterials = true;
         director.useUnlitDialogueMaterials = true;
-        director.battleOpponentYawCorrection = 180f;
+        director.battleOpponentYawCorrection = 0f;
         director.battlePlayerYawCorrection = 150f;
+        director.playerPresentationController =
+            EnsurePlayerCinematicController();
 
         if (dialogueController.lines == null ||
             dialogueController.lines.Length == 0)
@@ -524,20 +532,20 @@ public static class ARBookPresentationSceneSetup
         GameObject controls = EnsureUIObject(
             canvas,
             "BattleControls",
-            new Vector2(0.69f, 0.05f),
-            new Vector2(0.96f, 0.2f));
+            new Vector2(0.34f, 0.035f),
+            new Vector2(0.66f, 0.19f));
         Button attack = EnsureButton(
             controls.transform,
             "AttackButton",
             "攻击",
             new Vector2(0f, 0f),
-            new Vector2(0.62f, 1f),
+            new Vector2(0.78f, 1f),
             new Color(0.72f, 0.13f, 0.12f, 0.95f));
         Button exit = EnsureButton(
             controls.transform,
             "ExitButton",
             "退出",
-            new Vector2(0.68f, 0f),
+            new Vector2(0.82f, 0f),
             new Vector2(1f, 1f),
             new Color(0.12f, 0.15f, 0.18f, 0.95f));
 
@@ -1036,6 +1044,34 @@ public static class ARBookPresentationSceneSetup
                 label.font = font;
             }
         }
+    }
+
+    private static RuntimeAnimatorController EnsurePlayerCinematicController()
+    {
+        RuntimeAnimatorController controller =
+            AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+                PlayerCinematicControllerPath);
+        if (controller != null)
+        {
+            return controller;
+        }
+
+        if (!AssetDatabase.CopyAsset(
+                PlayerControllerPath,
+                PlayerCinematicControllerPath))
+        {
+            Debug.LogError(
+                $"Could not create {PlayerCinematicControllerPath}.");
+            return AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+                PlayerControllerPath);
+        }
+
+        AssetDatabase.ImportAsset(
+            PlayerCinematicControllerPath,
+            ImportAssetOptions.ForceSynchronousImport);
+        AssetDatabase.SaveAssets();
+        return AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+            PlayerCinematicControllerPath);
     }
 
     private sealed class BattleUI

@@ -11,6 +11,7 @@ public class ARBookPresentationActor : MonoBehaviour
     public string defeatState = "Defeat";
     public string speakState = "Speak";
     public string greetingState = "Greeting";
+    public bool holdCurrentAnimation;
     [Header("Animator Parameters")]
     public string battleEntryTrigger = "BattleEntryTrigger";
     public string captureSuccessTrigger = "CaptureSuccessTrigger";
@@ -26,31 +27,61 @@ public class ARBookPresentationActor : MonoBehaviour
 
     public void PlayIdle()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayState(idleState);
     }
 
     public void PlayEntry()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayTriggerOrState(battleEntryTrigger, entryState);
     }
 
     public void PlayAttack()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayState(attackState);
     }
 
     public void PlayHit()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayState(hitState);
     }
 
     public void PlayVictory()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayState(victoryState);
     }
 
     public void PlayDefeat()
     {
+        if (holdCurrentAnimation)
+        {
+            return;
+        }
+
         PlayState(defeatState);
     }
 

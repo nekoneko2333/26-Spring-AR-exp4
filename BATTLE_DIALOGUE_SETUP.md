@@ -297,8 +297,8 @@ Base Layer
 | 参数名 | 类型 | 用途 |
 |---|---|---|
 | `Speed` | Float | `0` 待机，约 `0.5` 走路，约 `1` 跑步 |
-| `Turn` | Float | 小于 `-0.35` 左转，大于 `0.35` 右转 |
-| `IdleVariant` | Int | `0` 使用 Idle_A，`1` 使用 Idle_B |
+| `Turn` | Float | 预留；当前地图移动脚本不驱动 |
+| `IdleVariant` | Int | 预留；当前地图移动脚本不驱动 |
 | `BattleEntryTrigger` | Trigger | 播放入场动画 |
 | `CaptureSuccessTrigger` | Trigger | 播放收服成功动画 |
 | `GreetingTrigger` | Trigger | 进入对话时打招呼 |
@@ -338,7 +338,8 @@ Idle_B -> Walk：Speed 大于 0.1
 
 取消“有退出时间”，过渡持续时间设为 `0.12`。
 
-`IdleVariant` 由脚本每隔一段时间随机设置，不要依赖动画器自己随机。
+当前先不要建立 `Idle_A <-> Idle_B` 的自动过渡。地图移动稳定后，再单独增加待机
+随机脚本，否则待机条件可能在移动时抢走 `Walk`。
 
 #### Walk
 
@@ -351,11 +352,18 @@ Idle_B -> Walk：Speed 大于 0.1
 Walk -> Idle_A：Speed 小于 0.1，并且 IdleVariant 等于 0
 Walk -> Idle_B：Speed 小于 0.1，并且 IdleVariant 等于 1
 Walk -> Run：Speed 大于 0.75
-Walk -> TurnLeft：Turn 小于 -0.35
-Walk -> TurnRight：Turn 大于 0.35
 ```
 
 全部取消“有退出时间”，过渡持续时间设为 `0.08-0.12`。
+
+当前地图移动脚本只稳定写入：
+
+```text
+IsWalking = true / false
+Speed = 0.5 / 0
+```
+
+因此暂时不要创建 `Walk -> TurnLeft/TurnRight` 条件。
 
 #### Run
 
@@ -366,8 +374,6 @@ Walk -> TurnRight：Turn 大于 0.35
 
 ```text
 Run -> Walk：Speed 小于 0.65
-Run -> TurnLeft：Turn 小于 -0.35
-Run -> TurnRight：Turn 大于 0.35
 ```
 
 取消“有退出时间”，过渡持续时间设为 `0.08`。
@@ -478,6 +484,20 @@ Reaction_03 -> Idle_A
 
 先在模型导入器的“动画”页逐个预览。`join` 和 `unique_poke_1` 哪个更像收服成功，
 以实际预览为准。
+
+### 当前移动配置
+
+为了不影响现有地图行走，当前先只保留：
+
+```text
+Idle_A -> Walk：Speed 大于 0.1
+Walk -> Idle_A：Speed 小于 0.1
+```
+
+如果暂时没有跑步速度切换，就不要创建 `Walk -> Run`。`Idle_B`、`TurnLeft` 和
+`TurnRight` 可以先把状态和动画片段放好，但不要连过渡。
+
+地图行走稳定后，再增加真实转向角速度和随机待机驱动。
 
 ### 对话反应规则
 

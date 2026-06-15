@@ -60,11 +60,6 @@ public class ARBookPresentationSession : MonoBehaviour
 
     public void Exit()
     {
-        if (!IsActive)
-        {
-            return;
-        }
-
         if (presentationCamera != null)
         {
             presentationCamera.enabled = false;

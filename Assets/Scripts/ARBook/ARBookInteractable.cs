@@ -25,6 +25,8 @@ public class ARBookInteractable : MonoBehaviour
     public GameObject presentationModelRoot;
     [Tooltip("可选。对话或战斗副本使用的动画控制器。")]
     public RuntimeAnimatorController presentationAnimatorController;
+    [Tooltip("战斗演出中保持模型当前待机，不切换其他战斗动画。")]
+    public bool keepBattleIdle;
 
     private int dialogueIndex;
 
