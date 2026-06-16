@@ -15,6 +15,7 @@ public class ARBookGameShellController : MonoBehaviour
     {
         public string captureId;
         public string displayName;
+        public string imageTargetName;
         public Sprite portrait;
         public Texture2D portraitTexture;
         public GameObject companionPrefab;
@@ -49,6 +50,10 @@ public class ARBookGameShellController : MonoBehaviour
     [Range(1, 6)] public int maxActiveCompanions = 3;
     public float companionSpacing = 0.85f;
     public Vector3 companionLocalOffset = new Vector3(0f, 0f, 1.2f);
+    public Vector3 companionImageTargetLocalOffset = Vector3.zero;
+    public bool hideCompanionUntilImageTracked = true;
+    [Range(1, 25)] public int companionInteractionAffectionGain = 5;
+    public string singlePokemonRootName = "SinglePokemon";
 
     [Header("Scene UI References")]
     public RectTransform generatedRoot;
@@ -99,6 +104,10 @@ public class ARBookGameShellController : MonoBehaviour
     private readonly HashSet<string> selectedCompanionIds = new HashSet<string>();
     private readonly Dictionary<string, GameObject> placedCompanions =
         new Dictionary<string, GameObject>();
+    private string activeCompanionId;
+    private VuforiaObserverBehaviour activeCompanionTarget;
+    private GameObject activeSceneCompanionModel;
+    private float nextCompanionTargetLookupTime;
     private float nextRefreshTime;
 
     public bool IsHudVisible =>
@@ -118,6 +127,7 @@ public class ARBookGameShellController : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        maxActiveCompanions = 1;
         EnsureCatalog();
         EnsureCanvas();
         BindSceneInterface();
@@ -151,6 +161,9 @@ public class ARBookGameShellController : MonoBehaviour
 
     private void Update()
     {
+        RefreshPlacedCompanionTracking();
+        HandleCompanionScreenInput();
+
         if (Time.unscaledTime < nextRefreshTime)
         {
             return;
@@ -253,6 +266,7 @@ public class ARBookGameShellController : MonoBehaviour
 
     public void ShowHome()
     {
+        SetSinglePokemonTargetsActive(null);
         SetRootActive(homeRoot, true);
         SetRootActive(hudRoot, false);
         SetRootActive(companionRoot, false);
@@ -266,6 +280,11 @@ public class ARBookGameShellController : MonoBehaviour
     {
         PlayerPrefs.SetInt(StartedKey, 1);
         PlayerPrefs.Save();
+        if (string.IsNullOrWhiteSpace(activeCompanionId))
+        {
+            SetSinglePokemonTargetsActive(null);
+        }
+
         SetRootActive(homeRoot, false);
         SetRootActive(hudRoot, true);
         SetRootActive(companionRoot, false);
@@ -302,6 +321,10 @@ public class ARBookGameShellController : MonoBehaviour
         HideTransientUi();
         HideActionButtons();
         selectedCompanionIds.Clear();
+        if (!string.IsNullOrWhiteSpace(activeCompanionId))
+        {
+            selectedCompanionIds.Add(activeCompanionId);
+        }
         BuildCompanionGrid();
         RefreshCompanionDetail();
     }
@@ -345,6 +368,59 @@ public class ARBookGameShellController : MonoBehaviour
 
     public void PlaceSelectedCompanions()
     {
+        string captureId = GetSelectedCompanionId();
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            RefreshCompanionDetail();
+            return;
+        }
+
+        CompanionDefinition definition = FindCompanion(captureId);
+        if (definition == null)
+        {
+            RefreshCompanionDetail();
+            return;
+        }
+
+        DestroyPlacedCompanions(false);
+        activeCompanionId = captureId;
+        activeCompanionTarget = FindCompanionImageTarget(definition);
+        if (activeCompanionTarget == null)
+        {
+            companionDetailText.text =
+                $"没有找到 {GetCompanionTargetName(definition)} 的单张识别图。";
+            return;
+        }
+
+        SetSinglePokemonTargetsActive(activeCompanionTarget);
+        GameObject instance = CreateCompanionInstance(definition, 0);
+        if (instance != null)
+        {
+            placedCompanions[captureId] = instance;
+            ConfigureCompanionInstance(instance, definition);
+            RefreshPlacedCompanionTracking(true);
+        }
+
+        RefreshCompanionDetail();
+        CloseCompanionModeToCamera();
+    }
+
+    private void CloseCompanionModeToCamera()
+    {
+        PlayerPrefs.SetInt(StartedKey, 1);
+        PlayerPrefs.Save();
+        SetRootActive(homeRoot, false);
+        SetRootActive(companionRoot, false);
+        SetRootActive(backpackRoot, false);
+        SetRootActive(hudRoot, true);
+        HideTransientUi();
+        HideActionButtons();
+        RefreshAll();
+    }
+
+#if false
+    private void PlaceSelectedCompanionsDisabled()
+    {
         int placedCount = placedCompanions.Count;
         foreach (string captureId in selectedCompanionIds)
         {
@@ -371,6 +447,7 @@ public class ARBookGameShellController : MonoBehaviour
 
         RefreshCompanionDetail();
     }
+#endif
 
     public void DespawnAllCompanions()
     {
@@ -382,13 +459,26 @@ public class ARBookGameShellController : MonoBehaviour
     {
         foreach (KeyValuePair<string, GameObject> pair in placedCompanions)
         {
-            if (pair.Value != null)
+            if (pair.Value == null)
+            {
+                continue;
+            }
+
+            if (pair.Value == activeSceneCompanionModel)
+            {
+                pair.Value.SetActive(false);
+            }
+            else
             {
                 DestroyRuntimeObject(pair.Value, immediate);
             }
         }
 
         placedCompanions.Clear();
+        activeCompanionId = null;
+        activeCompanionTarget = null;
+        activeSceneCompanionModel = null;
+        SetSinglePokemonTargetsActive(null);
     }
 
     private static void DestroyRuntimeObject(GameObject target, bool immediate)
@@ -410,13 +500,17 @@ public class ARBookGameShellController : MonoBehaviour
 
     public void AddAffectionToSelected()
     {
-        foreach (string captureId in selectedCompanionIds)
+        string captureId = GetSelectedCompanionId();
+        if (string.IsNullOrWhiteSpace(captureId))
         {
-            int value = Mathf.Clamp(GetAffection(captureId) + 5, 0, 100);
-            PlayerPrefs.SetInt(GetAffectionKey(captureId), value);
+            captureId = activeCompanionId;
         }
 
-        PlayerPrefs.Save();
+        if (!string.IsNullOrWhiteSpace(captureId))
+        {
+            AddAffection(captureId, companionInteractionAffectionGain);
+        }
+
         BuildCompanionGrid();
         RefreshCompanionDetail();
     }
@@ -426,8 +520,74 @@ public class ARBookGameShellController : MonoBehaviour
         return new CompanionDefinition
         {
             captureId = captureId,
-            displayName = displayName
+            displayName = displayName,
+            imageTargetName = ResolveDefaultImageTargetName(captureId)
         };
+    }
+
+    private static string ResolveDefaultImageTargetName(string captureId)
+    {
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return captureId;
+        }
+
+        if (string.Equals(captureId, "ElectrodeHisuian", StringComparison.OrdinalIgnoreCase))
+        {
+            return "electrode";
+        }
+
+        if (string.Equals(captureId, "Talonflame", StringComparison.OrdinalIgnoreCase))
+        {
+            return "GalarianZapdos";
+        }
+
+        if (string.Equals(captureId, "Mismagius", StringComparison.OrdinalIgnoreCase))
+        {
+            return "mismagius";
+        }
+
+        if (string.Equals(captureId, "Toxtricity", StringComparison.OrdinalIgnoreCase))
+        {
+            return "toxtricity";
+        }
+
+        if (string.Equals(captureId, "Scizor", StringComparison.OrdinalIgnoreCase))
+        {
+            return "scizor";
+        }
+
+        if (string.Equals(captureId, "Zorua", StringComparison.OrdinalIgnoreCase))
+        {
+            return "zorua";
+        }
+
+        if (string.Equals(captureId, "Zekrom", StringComparison.OrdinalIgnoreCase))
+        {
+            return "zekrom";
+        }
+
+        if (string.Equals(captureId, "Dragapult", StringComparison.OrdinalIgnoreCase))
+        {
+            return "dragapult";
+        }
+
+        if (string.Equals(captureId, "Celebi", StringComparison.OrdinalIgnoreCase))
+        {
+            return "celebi";
+        }
+
+        if (string.Equals(captureId, "Mew", StringComparison.OrdinalIgnoreCase))
+        {
+            return "mew";
+        }
+
+        if (string.Equals(captureId, "Manaphy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "manaphy";
+        }
+
+        return captureId;
     }
 
     private void ResolveReferences()
@@ -1427,6 +1587,7 @@ public class ARBookGameShellController : MonoBehaviour
 
     private void CreateCompanionCard(CompanionDefinition definition, int index)
     {
+        bool isSelected = selectedCompanionIds.Contains(definition.captureId);
         RectTransform card = CreatePanel(
             $"Card_{definition.captureId}",
             companionGrid,
@@ -1442,6 +1603,9 @@ public class ARBookGameShellController : MonoBehaviour
         if (cardImage != null)
         {
             cardImage.raycastTarget = true;
+            cardImage.color = isSelected
+                ? new Color(1f, 0.92f, 0.36f, 0.95f)
+                : new Color(0.12f, 0.16f, 0.22f, 0.88f);
         }
 
         Button button = card.gameObject.AddComponent<Button>();
@@ -1484,17 +1648,12 @@ public class ARBookGameShellController : MonoBehaviour
 
     private void ToggleCompanionSelection(string captureId)
     {
-        if (selectedCompanionIds.Contains(captureId))
-        {
-            selectedCompanionIds.Remove(captureId);
-        }
-        else
-        {
-            selectedCompanionIds.Add(captureId);
-        }
+        selectedCompanionIds.Clear();
+        selectedCompanionIds.Add(captureId);
 
         BuildCompanionGrid();
         RefreshCompanionDetail();
+        PlaceSelectedCompanions();
     }
 
     private void RefreshCompanionDetail()
@@ -1507,9 +1666,10 @@ public class ARBookGameShellController : MonoBehaviour
         if (selectedCompanionIds.Count == 0)
         {
             companionDetailText.text =
-                "\u9009\u62e9\u4e00\u4e2a\u6216\u591a\u4e2a\u5df2\u6536\u670d\u7684\u7cbe\u7075\u3002\n\n" +
-                "\u653e\u7f6e\uff1a\u628a\u9009\u4e2d\u7cbe\u7075\u653e\u5230\u6444\u50cf\u673a\u89c6\u91ce\u91cc\u3002\n" +
-                "\u4e92\u52a8\uff1a\u63d0\u5347\u9009\u4e2d\u7cbe\u7075\u7684\u597d\u611f\u5ea6\u3002";
+                "\u9009\u62e9\u4e00\u4e2a\u5df2\u6536\u670d\u7684\u7cbe\u7075\u3002\n\n" +
+                "\u786e\u8ba4\uff1a\u5173\u95ed\u7a97\u53e3\u5e76\u56de\u5230\u6444\u50cf\u5934\u753b\u9762\u3002\n" +
+                "\u8bc6\u522b\uff1a\u5bf9\u51c6\u5bf9\u5e94\u5b9d\u53ef\u68a6\u56fe\u7247\u540e\u663e\u793a\u6a21\u578b\u3002\n" +
+                "\u4e92\u52a8\uff1a\u70b9\u51fb\u6a21\u578b\u6216\u6309\u94ae\u63d0\u5347\u597d\u611f\u5ea6\u3002";
             return;
         }
 
@@ -1521,7 +1681,7 @@ public class ARBookGameShellController : MonoBehaviour
             text += $"- {display}  \u597d\u611f {GetAffection(captureId)}\n";
         }
 
-        text += $"\n\u5df2\u653e\u7f6e\uff1a{placedCompanions.Count} / {maxActiveCompanions}";
+        text += $"\n\u5df2\u653e\u7f6e\uff1a{placedCompanions.Count} / 1";
         companionDetailText.text = text;
     }
 
@@ -1563,10 +1723,15 @@ public class ARBookGameShellController : MonoBehaviour
             return null;
         }
 
-        Transform parent = companionPlacementRoot != null
-            ? companionPlacementRoot
-            : transform;
-        GameObject instance = null;
+        Transform parent = ResolveCompanionParent(definition);
+        GameObject instance = ResolveSinglePokemonSceneModel(activeCompanionTarget);
+        if (instance != null)
+        {
+            activeSceneCompanionModel = instance;
+            instance.SetActive(!hideCompanionUntilImageTracked ||
+                IsTracked(activeCompanionTarget));
+            return instance;
+        }
 
         GameObject source = definition.companionPrefab != null
             ? definition.companionPrefab
@@ -1579,14 +1744,417 @@ public class ARBookGameShellController : MonoBehaviour
 
         if (instance == null)
         {
+            Debug.LogWarning(
+                $"Companion {definition.captureId} has no SinglePokemon model, prefab, or scene object.",
+                this);
             return null;
         }
 
         instance.transform.SetParent(parent, false);
-        float offset = (index - (maxActiveCompanions - 1) * 0.5f) * companionSpacing;
-        instance.transform.localPosition = companionLocalOffset + new Vector3(offset, 0f, 0f);
+        bool useTargetSpace = activeCompanionTarget != null &&
+            parent == activeCompanionTarget.transform;
+        instance.transform.localPosition = useTargetSpace
+            ? companionImageTargetLocalOffset
+            : companionLocalOffset;
         instance.transform.localRotation = Quaternion.identity;
         return instance;
+    }
+
+    private string GetSelectedCompanionId()
+    {
+        foreach (string captureId in selectedCompanionIds)
+        {
+            return captureId;
+        }
+
+        return null;
+    }
+
+    private void ConfigureCompanionInstance(
+        GameObject instance,
+        CompanionDefinition definition)
+    {
+        if (instance == null || definition == null)
+        {
+            return;
+        }
+
+        ARVirtualPetController pet =
+            instance.GetComponentInChildren<ARVirtualPetController>(true);
+        if (pet == null)
+        {
+            pet = instance.AddComponent<ARVirtualPetController>();
+        }
+
+        pet.petId = definition.captureId;
+        pet.onInteracted.RemoveListener(HandlePlacedCompanionInteracted);
+        pet.onInteracted.AddListener(HandlePlacedCompanionInteracted);
+
+        ARTouchTransform touchTransform =
+            instance.GetComponent<ARTouchTransform>();
+        if (touchTransform == null)
+        {
+            instance.AddComponent<ARTouchTransform>();
+        }
+
+        ARBookCompanionTapProxy tapProxy =
+            instance.GetComponent<ARBookCompanionTapProxy>();
+        if (tapProxy == null)
+        {
+            tapProxy = instance.AddComponent<ARBookCompanionTapProxy>();
+        }
+
+        tapProxy.petController = pet;
+        EnsureCompanionColliders(instance);
+    }
+
+    private void HandlePlacedCompanionInteracted()
+    {
+        if (!string.IsNullOrWhiteSpace(activeCompanionId))
+        {
+            AddAffection(activeCompanionId, companionInteractionAffectionGain);
+            RefreshCompanionDetail();
+        }
+    }
+
+    private void HandleCompanionScreenInput()
+    {
+        if (string.IsNullOrWhiteSpace(activeCompanionId) ||
+            (companionRoot != null && companionRoot.gameObject.activeInHierarchy) ||
+            (dialogueRoot != null && dialogueRoot.gameObject.activeInHierarchy) ||
+            (battleRoot != null && battleRoot.gameObject.activeInHierarchy))
+        {
+            return;
+        }
+
+        if (!TryGetCompanionPointerDown(out Vector2 screenPosition))
+        {
+            return;
+        }
+
+        Camera rayCamera = Camera.main;
+        if (rayCamera == null)
+        {
+            return;
+        }
+
+        Ray ray = rayCamera.ScreenPointToRay(screenPosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, 100f))
+        {
+            return;
+        }
+
+        if (!placedCompanions.TryGetValue(activeCompanionId, out GameObject instance) ||
+            instance == null ||
+            (!hit.transform.IsChildOf(instance.transform) && hit.transform.gameObject != instance))
+        {
+            return;
+        }
+
+        ARVirtualPetController pet =
+            hit.transform.GetComponentInParent<ARVirtualPetController>();
+        if (pet == null)
+        {
+            pet = instance.GetComponentInChildren<ARVirtualPetController>(true);
+        }
+
+        if (pet == null)
+        {
+            return;
+        }
+
+        pet.Pet();
+    }
+
+    private static bool TryGetCompanionPointerDown(out Vector2 screenPosition)
+    {
+        screenPosition = Vector2.zero;
+
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase != TouchPhase.Began ||
+                IsPointerOverUi(touch.fingerId))
+            {
+                return false;
+            }
+
+            screenPosition = touch.position;
+            return true;
+        }
+
+        if (!Input.GetMouseButtonDown(0) ||
+            IsPointerOverUi(-1))
+        {
+            return false;
+        }
+
+        screenPosition = Input.mousePosition;
+        return true;
+    }
+
+    private static bool IsPointerOverUi(int pointerId)
+    {
+        if (EventSystem.current == null)
+        {
+            return false;
+        }
+
+        return pointerId >= 0
+            ? EventSystem.current.IsPointerOverGameObject(pointerId)
+            : EventSystem.current.IsPointerOverGameObject();
+    }
+
+    private void AddAffection(string captureId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return;
+        }
+
+        int value = Mathf.Clamp(GetAffection(captureId) + amount, 0, 100);
+        PlayerPrefs.SetInt(GetAffectionKey(captureId), value);
+        PlayerPrefs.Save();
+    }
+
+    private Transform ResolveCompanionParent(CompanionDefinition definition)
+    {
+        VuforiaObserverBehaviour target = activeCompanionTarget;
+        if (target == null)
+        {
+            target = FindCompanionImageTarget(definition);
+            activeCompanionTarget = target;
+        }
+
+        if (target != null)
+        {
+            return target.transform;
+        }
+
+        return companionPlacementRoot != null
+            ? companionPlacementRoot
+            : transform;
+    }
+
+    private VuforiaObserverBehaviour FindCompanionImageTarget(
+        CompanionDefinition definition)
+    {
+        if (definition == null)
+        {
+            return null;
+        }
+
+        string targetName = GetCompanionTargetName(definition);
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            return null;
+        }
+
+        VuforiaObserverBehaviour[] observers =
+            FindObjectsOfType<VuforiaObserverBehaviour>(true);
+        for (int i = 0; i < observers.Length; i++)
+        {
+            VuforiaObserverBehaviour observer = observers[i];
+            if (observer != null &&
+                IsSinglePokemonObserver(observer) &&
+                string.Equals(
+                    NormalizeCompanionAssetName(observer.TargetName),
+                    NormalizeCompanionAssetName(targetName),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return observer;
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsSinglePokemonObserver(VuforiaObserverBehaviour observer)
+    {
+        Transform root = FindSinglePokemonRoot();
+        return root != null &&
+               observer != null &&
+               observer.transform.IsChildOf(root);
+    }
+
+    private Transform FindSinglePokemonRoot()
+    {
+        GameObject[] roots = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            GameObject candidate = roots[i];
+            if (candidate != null &&
+                candidate.scene.IsValid() &&
+                string.Equals(
+                    candidate.name,
+                    singlePokemonRootName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate.transform;
+            }
+        }
+
+        return null;
+    }
+
+    private void SetSinglePokemonTargetsActive(
+        VuforiaObserverBehaviour selectedTarget)
+    {
+        Transform root = FindSinglePokemonRoot();
+        if (root == null)
+        {
+            return;
+        }
+
+        bool hasSelection = selectedTarget != null;
+        root.gameObject.SetActive(hasSelection);
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            VuforiaObserverBehaviour observer =
+                child.GetComponent<VuforiaObserverBehaviour>();
+            child.gameObject.SetActive(observer != null &&
+                observer == selectedTarget);
+        }
+    }
+
+    private static GameObject ResolveSinglePokemonSceneModel(
+        VuforiaObserverBehaviour target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < target.transform.childCount; i++)
+        {
+            Transform child = target.transform.GetChild(i);
+            if (child.GetComponentInChildren<Renderer>(true) != null)
+            {
+                return child.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetCompanionTargetName(CompanionDefinition definition)
+    {
+        if (definition == null)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(definition.imageTargetName)
+            ? ResolveDefaultImageTargetName(definition.captureId)
+            : definition.imageTargetName;
+    }
+
+    private static string NormalizeCompanionAssetName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        string normalized = value.Trim();
+        if (normalized.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            normalized.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+            normalized.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = System.IO.Path.GetFileNameWithoutExtension(normalized);
+        }
+
+        const string scaledSuffix = "_scaled";
+        if (normalized.EndsWith(scaledSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized.Substring(0, normalized.Length - scaledSuffix.Length);
+        }
+
+        return normalized;
+    }
+
+    private void RefreshPlacedCompanionTracking(bool forceLookup = false)
+    {
+        if (string.IsNullOrWhiteSpace(activeCompanionId) ||
+            !placedCompanions.TryGetValue(activeCompanionId, out GameObject instance) ||
+            instance == null)
+        {
+            return;
+        }
+
+        CompanionDefinition definition = FindCompanion(activeCompanionId);
+        if (definition == null)
+        {
+            return;
+        }
+
+        if (forceLookup || (activeCompanionTarget == null &&
+            Time.unscaledTime >= nextCompanionTargetLookupTime))
+        {
+            activeCompanionTarget = FindCompanionImageTarget(definition);
+            nextCompanionTargetLookupTime = Time.unscaledTime + 1f;
+        }
+
+        if (activeCompanionTarget != null)
+        {
+            SetSinglePokemonTargetsActive(activeCompanionTarget);
+
+            if (instance != activeSceneCompanionModel &&
+                instance.transform.parent != activeCompanionTarget.transform)
+            {
+                instance.transform.SetParent(activeCompanionTarget.transform, false);
+                instance.transform.localPosition = companionImageTargetLocalOffset;
+                instance.transform.localRotation = Quaternion.identity;
+            }
+
+            instance.SetActive(!hideCompanionUntilImageTracked ||
+                IsTracked(activeCompanionTarget));
+            return;
+        }
+
+        if (instance.transform.parent == null)
+        {
+            instance.transform.SetParent(
+                companionPlacementRoot != null ? companionPlacementRoot : transform,
+                false);
+        }
+
+        instance.SetActive(!hideCompanionUntilImageTracked);
+    }
+
+    private static void EnsureCompanionColliders(GameObject instance)
+    {
+        if (instance == null)
+        {
+            return;
+        }
+
+        if (instance.GetComponent<Collider>() != null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            instance.AddComponent<SphereCollider>();
+            return;
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        Vector3 center = instance.transform.InverseTransformPoint(bounds.center);
+        Vector3 size = bounds.size;
+        float radius = Mathf.Max(size.x, size.y, size.z) * 0.35f;
+        SphereCollider collider = instance.AddComponent<SphereCollider>();
+        collider.center = center;
+        collider.radius = Mathf.Max(0.05f, radius);
     }
 
     private string GetCurrentQuestText()
@@ -2391,9 +2959,15 @@ public class ARBookGameShellController : MonoBehaviour
         CompanionDefinition definition)
     {
         RectTransform rect = CreateRect(name, parent);
+        UIImage background = rect.gameObject.AddComponent<UIImage>();
+        background.color = new Color(0.18f, 0.21f, 0.28f, 1f);
+        background.raycastTarget = false;
+
         if (definition != null && definition.portrait != null)
         {
-            UIImage image = rect.gameObject.AddComponent<UIImage>();
+            RectTransform imageRect = CreateRect("PortraitSprite", rect);
+            Stretch(imageRect, 0f, 0f, 0f, 0f);
+            UIImage image = imageRect.gameObject.AddComponent<UIImage>();
             image.sprite = definition.portrait;
             image.preserveAspect = true;
             image.raycastTarget = false;
@@ -2402,14 +2976,18 @@ public class ARBookGameShellController : MonoBehaviour
 
         if (definition != null && definition.portraitTexture != null)
         {
-            RawImage rawImage = rect.gameObject.AddComponent<RawImage>();
+            RectTransform imageRect = CreateRect("PortraitTexture", rect);
+            Stretch(imageRect, 0f, 0f, 0f, 0f);
+            RawImage rawImage = imageRect.gameObject.AddComponent<RawImage>();
             rawImage.texture = definition.portraitTexture;
+            rawImage.color = Color.white;
             rawImage.raycastTarget = false;
             return rect;
         }
 
-        UIImage fallback = rect.gameObject.AddComponent<UIImage>();
-        fallback.raycastTarget = false;
+        Debug.LogWarning(
+            $"Companion portrait is not assigned for {definition?.captureId}.",
+            this);
         return rect;
     }
 

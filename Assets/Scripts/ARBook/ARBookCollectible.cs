@@ -12,6 +12,10 @@ public class ARBookCollectible : MonoBehaviour
     public float collectionRadius = 0.5f;
     public ARBookPlayerMover playerMover;
     public bool hideIfAlreadyCollected = true;
+    [Header("Power Reward")]
+    public bool grantAttackPower = true;
+    [Min(0)] public int attackPowerReward = 10;
+    public ARBookPlayerPower playerPower;
 
     [Header("Feedback")]
     public ParticleSystem collectEffect;
@@ -79,6 +83,7 @@ public class ARBookCollectible : MonoBehaviour
         }
 
         collected = true;
+        GrantPowerReward();
         PlayFeedback();
         onCollected?.Invoke();
 
@@ -99,6 +104,24 @@ public class ARBookCollectible : MonoBehaviour
         if (audioSource != null && collectClip != null)
         {
             audioSource.PlayOneShot(collectClip);
+        }
+    }
+
+    private void GrantPowerReward()
+    {
+        if (!grantAttackPower || attackPowerReward <= 0)
+        {
+            return;
+        }
+
+        if (playerPower == null)
+        {
+            playerPower = ARBookPlayerPower.Resolve();
+        }
+
+        if (playerPower != null)
+        {
+            playerPower.GrantAttackPower(attackPowerReward);
         }
     }
 

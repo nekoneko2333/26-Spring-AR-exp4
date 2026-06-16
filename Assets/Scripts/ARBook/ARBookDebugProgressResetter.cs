@@ -63,6 +63,7 @@ public class ARBookDebugProgressResetter : MonoBehaviour
 
         DeleteKey("CapturedIds");
         DeleteKey("FinaleCompleted");
+        DeleteKey(ARBookPlayerPower.AttackBonusKey);
         PlayerPrefs.Save();
 
         if (logClearedKeys)

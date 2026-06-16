@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class ARBookBattleCombatant : MonoBehaviour
 {
-    public string displayName = "Combatant";
+    public string displayName = "战斗单位";
     [Min(1)] public int maxHP = 100;
     [Min(1)] public int attackPower = 20;
     public ARBookPresentationActor actor;
@@ -57,6 +57,18 @@ public class ARBookBattleCombatant : MonoBehaviour
         {
             actor?.PlayHit();
         }
+    }
+
+    public void Heal(int amount)
+    {
+        if (IsDefeated)
+        {
+            return;
+        }
+
+        CurrentHP = Mathf.Clamp(CurrentHP + Mathf.Max(0, amount), 0, maxHP);
+        RefreshUI();
+        actor?.PlayVictory();
     }
 
     public void PlayVictory()

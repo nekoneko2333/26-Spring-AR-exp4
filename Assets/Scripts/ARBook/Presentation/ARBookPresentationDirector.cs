@@ -21,6 +21,9 @@ public class ARBookPresentationDirector : MonoBehaviour
     [Header("Automatic Model Size")]
     [Min(0.1f)] public float battleOpponentHeight = 1.35f;
     [Min(0.1f)] public float battlePlayerHeight = 4.2f;
+    [Min(0.1f)] public float battleAssistHeight = 1.25f;
+    public Vector3 battleAssistLocalOffsetA = new Vector3(0.9f, 0f, 0.15f);
+    public Vector3 battleAssistLocalOffsetB = new Vector3(1.55f, 0f, 0.3f);
     [Min(0.1f)] public float dialogueActorHeight = 3.6f;
     [Min(0.1f)] public float capturableDialogueActorHeight = 4.8f;
     [Min(0.1f)] public float dialoguePlayerHeight = 4.4f;
@@ -34,6 +37,7 @@ public class ARBookPresentationDirector : MonoBehaviour
 
     private GameObject battleOpponentClone;
     private GameObject battlePlayerClone;
+    private readonly List<GameObject> battleAssistClones = new List<GameObject>();
     private GameObject dialogueLeftClone;
     private GameObject dialogueRightClone;
     private Action captureOnVictory;
@@ -214,6 +218,20 @@ public class ARBookPresentationDirector : MonoBehaviour
         battleController.enemy.displayName = interactable.GetDisplayName();
         battleController.player.actor = playerActor;
         battleController.player.displayName = "训练家";
+
+        ARBookPlayerPower playerPower = ARBookPlayerPower.Resolve();
+        if (playerPower != null)
+        {
+            playerPower.ApplyToCombatant(battleController.player);
+        }
+
+        ARBookBattleStats battleStats =
+            interactable.GetComponent<ARBookBattleStats>();
+        if (battleStats != null)
+        {
+            battleStats.ApplyToEnemy(battleController.enemy);
+        }
+
         battleController.cameraRig?.SetIntroTarget(
             battlePlayerClone.transform);
         battleController.SetIntroOpponent(battleOpponentClone);

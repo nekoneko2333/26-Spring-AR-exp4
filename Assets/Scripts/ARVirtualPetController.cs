@@ -1,6 +1,7 @@
 using TMPro;
 using System;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class ARVirtualPetController : MonoBehaviour
@@ -13,6 +14,7 @@ public class ARVirtualPetController : MonoBehaviour
     public bool saveState = true;
     public float offlineHungerIncreasePerHour = 8f;
     public float offlineMoodDecreasePerHour = 5f;
+    public float minimumInteractionInterval = 0.15f;
 
     [Header("State Change")]
     public float hungerIncreasePerSecond = 1.2f;
@@ -35,6 +37,9 @@ public class ARVirtualPetController : MonoBehaviour
     public TMP_Text hungerText;
     public Slider moodSlider;
     public Slider hungerSlider;
+    public UnityEvent onInteracted = new UnityEvent();
+
+    private float lastPetInteractionTime = -999f;
 
     private void Reset()
     {
@@ -95,12 +100,19 @@ public class ARVirtualPetController : MonoBehaviour
 
     public void Pet()
     {
+        if (Time.unscaledTime - lastPetInteractionTime < minimumInteractionInterval)
+        {
+            return;
+        }
+
+        lastPetInteractionTime = Time.unscaledTime;
         isSleeping = false;
         mood = Mathf.Clamp(mood + 18f, 0f, 100f);
         TriggerAnimation("Happy");
         PlayEffect(happyEffect);
         PlayClip(petClip);
         SetStatus("被摸摸很开心");
+        onInteracted?.Invoke();
         SaveState();
     }
 
