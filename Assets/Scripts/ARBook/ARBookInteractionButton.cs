@@ -5,22 +5,30 @@ using UnityEngine.UI;
 public class ARBookInteractionButton : MonoBehaviour
 {
     public ARBookPlayerMover playerMover;
+    public GameObject interactionRoot;
     public Button interactButton;
     public Text promptText;
     public TMP_Text promptTMPText;
+#if false
     public string promptFormat = "互动：{0}";
+#endif
+    public string promptFormat = "\u4e92\u52a8\uff1a{0}";
     public bool hideButtonWhenNoTarget = true;
     public ARBookCaptureController captureController;
     public bool useActivePlayerMover = true;
     public bool activateCapturableInteractablesOnStart = true;
+    public bool requireGameHudVisible = true;
+    public ARBookGameShellController gameShell;
 
     private ARBookInteractable currentInteractable;
 
     private void Start()
     {
+        promptFormat = "\u4e92\u52a8\uff1a{0}";
+
         if (promptFormat == "Interact: {0}")
         {
-            promptFormat = "互动：{0}";
+            promptFormat = "\u4e92\u52a8\uff1a{0}";
         }
 
         if (activateCapturableInteractablesOnStart)
@@ -38,7 +46,8 @@ public class ARBookInteractionButton : MonoBehaviour
             captureController = FindObjectOfType<ARBookCaptureController>();
         }
 
-        if (interactButton != null)
+        if (interactButton != null &&
+            !HasPersistentClick(interactButton, this, nameof(InteractWithCurrentTarget)))
         {
             interactButton.onClick.AddListener(InteractWithCurrentTarget);
         }
@@ -80,11 +89,29 @@ public class ARBookInteractionButton : MonoBehaviour
         currentInteractable.Interact();
     }
 
-    private void RefreshCurrentTarget()
+    public void RefreshCurrentTarget()
     {
+        if (!CanShowInteractionUi())
+        {
+            currentInteractable = null;
+            SetInteractionVisible(false);
+            SetPrompt(string.Empty);
+            if (captureController != null)
+            {
+                captureController.SetCurrentTarget(null);
+            }
+
+            return;
+        }
+
         ResolvePlayerMover();
         currentInteractable = FindBestInteractable();
         bool hasTarget = currentInteractable != null;
+
+        if (hasTarget)
+        {
+            EnsureVisibleParentChain();
+        }
 
         if (interactButton != null)
         {
@@ -92,7 +119,7 @@ public class ARBookInteractionButton : MonoBehaviour
 
             if (hideButtonWhenNoTarget)
             {
-                interactButton.gameObject.SetActive(hasTarget);
+                SetInteractionVisible(hasTarget);
             }
         }
 
@@ -202,6 +229,49 @@ public class ARBookInteractionButton : MonoBehaviour
         return activeMovers;
     }
 
+    private void EnsureVisibleParentChain()
+    {
+        GameObject root = interactionRoot != null
+            ? interactionRoot
+            : interactButton != null
+                ? interactButton.gameObject
+                : null;
+
+        if (root == null)
+        {
+            return;
+        }
+
+        root.SetActive(true);
+    }
+
+    private bool CanShowInteractionUi()
+    {
+        if (!requireGameHudVisible)
+        {
+            return true;
+        }
+
+        if (gameShell != null)
+        {
+            return gameShell.IsHudVisible;
+        }
+
+        return false;
+    }
+
+    private void SetInteractionVisible(bool visible)
+    {
+        if (interactionRoot != null)
+        {
+            interactionRoot.SetActive(visible);
+        }
+        else if (interactButton != null)
+        {
+            interactButton.gameObject.SetActive(visible);
+        }
+    }
+
     private void SetPrompt(string text)
     {
         if (promptTMPText != null)
@@ -213,5 +283,24 @@ public class ARBookInteractionButton : MonoBehaviour
         {
             promptText.text = text;
         }
+    }
+
+    private static bool HasPersistentClick(Button button, Object target, string methodName)
+    {
+        if (button == null || target == null || string.IsNullOrWhiteSpace(methodName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+        {
+            if (button.onClick.GetPersistentTarget(i) == target &&
+                button.onClick.GetPersistentMethodName(i) == methodName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

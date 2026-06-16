@@ -22,6 +22,8 @@ public class ARBookPresentationDirector : MonoBehaviour
     [Min(0.1f)] public float battleOpponentHeight = 1.35f;
     [Min(0.1f)] public float battlePlayerHeight = 4.2f;
     [Min(0.1f)] public float dialogueActorHeight = 3.6f;
+    [Min(0.1f)] public float capturableDialogueActorHeight = 4.8f;
+    [Min(0.1f)] public float dialoguePlayerHeight = 4.4f;
     public bool useUnlitBattleMaterials = true;
     public bool useUnlitDialogueMaterials = true;
     public float battleOpponentYawCorrection;
@@ -94,10 +96,13 @@ public class ARBookPresentationDirector : MonoBehaviour
         CleanupDialogueModels();
         SetAnchorActive(dialogueLeftAnchor);
         SetAnchorActive(dialogueRightAnchor);
+        float targetDialogueHeight = interactable.canBeCaptured
+            ? capturableDialogueActorHeight
+            : dialogueActorHeight;
         dialogueLeftClone = CreatePresentationClone(
             targetSource,
             dialogueLeftAnchor,
-            dialogueActorHeight,
+            targetDialogueHeight,
             "DialogueTarget",
             dialogueController.session != null
                 ? dialogueController.session.presentationCamera
@@ -105,7 +110,7 @@ public class ARBookPresentationDirector : MonoBehaviour
         dialogueRightClone = CreatePresentationClone(
             playerSource,
             dialogueRightAnchor,
-            dialogueActorHeight,
+            dialoguePlayerHeight,
             "DialoguePlayer",
             dialogueController.session != null
                 ? dialogueController.session.presentationCamera
@@ -117,7 +122,7 @@ public class ARBookPresentationDirector : MonoBehaviour
             return false;
         }
 
-        if (useUnlitDialogueMaterials)
+        if (useUnlitDialogueMaterials && !interactable.canBeCaptured)
         {
             ConvertToUnlit(dialogueLeftClone);
             ConvertToUnlit(dialogueRightClone);
@@ -187,10 +192,10 @@ public class ARBookPresentationDirector : MonoBehaviour
             return false;
         }
 
-        if (useUnlitBattleMaterials)
+        if (useUnlitBattleMaterials && !interactable.canBeCaptured)
         {
-            ApplyShadowlessMaterials(battleOpponentClone);
-            ApplyShadowlessMaterials(battlePlayerClone);
+            ConvertToUnlit(battleOpponentClone);
+            ConvertToUnlit(battlePlayerClone);
         }
 
         ARBookPresentationActor opponentActor =

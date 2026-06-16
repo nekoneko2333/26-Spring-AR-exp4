@@ -51,15 +51,6 @@ public class ARBookChapterProgress : MonoBehaviour
     {
         SetMemoryFragmentCollected(chapterId);
         CompleteChapter(chapterId);
-
-        if (dialogueManager != null)
-        {
-            dialogueManager.ShowDialogue("Chapter Complete", completeDialogue);
-        }
-        else
-        {
-            Debug.LogWarning("ARBookChapterProgress dialogueManager is not assigned.");
-        }
     }
 
     public void CompleteChapter01AfterPikachuCaptured()

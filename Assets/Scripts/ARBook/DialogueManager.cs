@@ -21,6 +21,7 @@ public class DialogueManager : MonoBehaviour
     private string currentSpeakerName;
     private string[] currentDialogueLines;
     private int currentDialogueIndex;
+    private bool dialogueOpenByManager;
 
     private void Awake()
     {
@@ -34,7 +35,8 @@ public class DialogueManager : MonoBehaviour
 
     private void Start()
     {
-        if (continueButton != null)
+        if (continueButton != null &&
+            !HasPersistentClick(continueButton, this, nameof(ContinueDialogue)))
         {
             continueButton.onClick.AddListener(ContinueDialogue);
         }
@@ -93,7 +95,11 @@ public class DialogueManager : MonoBehaviour
     {
         if (currentDialogueLines == null || currentDialogueLines.Length == 0)
         {
-            HideDialogue();
+            if (dialogueOpenByManager)
+            {
+                HideDialogue();
+            }
+
             return;
         }
 
@@ -116,6 +122,7 @@ public class DialogueManager : MonoBehaviour
         }
 
         dialoguePanel.SetActive(true);
+        dialogueOpenByManager = true;
 
         if (speakerNameTMPText != null)
         {
@@ -151,10 +158,30 @@ public class DialogueManager : MonoBehaviour
             dialoguePanel.SetActive(false);
             currentDialogueLines = null;
             currentDialogueIndex = 0;
+            dialogueOpenByManager = false;
         }
         else
         {
             Debug.LogWarning("DialogueManager dialoguePanel is not assigned.");
         }
+    }
+
+    private static bool HasPersistentClick(Button button, Object target, string methodName)
+    {
+        if (button == null || target == null || string.IsNullOrWhiteSpace(methodName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+        {
+            if (button.onClick.GetPersistentTarget(i) == target &&
+                button.onClick.GetPersistentMethodName(i) == methodName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

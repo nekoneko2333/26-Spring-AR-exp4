@@ -6,6 +6,7 @@ public class ARBookCaptureController : MonoBehaviour
     public Button captureButton;
     public DialogueManager dialogueManager;
     public ARBookCollectionManager collectionManager;
+    public ARBookGameShellController gameShell;
 
     private ARBookInteractable currentTarget;
 
@@ -23,7 +24,8 @@ public class ARBookCaptureController : MonoBehaviour
             collectionManager = FindObjectOfType<ARBookCollectionManager>();
         }
 
-        if (captureButton != null)
+        if (captureButton != null &&
+            !HasPersistentClick(captureButton, this, nameof(CaptureCurrentTarget)))
         {
             captureButton.onClick.AddListener(CaptureCurrentTarget);
         }
@@ -50,7 +52,7 @@ public class ARBookCaptureController : MonoBehaviour
         RefreshCaptureButton();
     }
 
-    private void CaptureCurrentTarget()
+    public void CaptureCurrentTarget()
     {
         if (!CanShowCaptureButton())
         {
@@ -113,7 +115,7 @@ public class ARBookCaptureController : MonoBehaviour
         RefreshCaptureButton();
     }
 
-    private void RefreshCaptureButton()
+    public void RefreshCaptureButton()
     {
         if (captureButton != null)
         {
@@ -138,6 +140,30 @@ public class ARBookCaptureController : MonoBehaviour
             return false;
         }
 
+        if (gameShell == null || !gameShell.IsHudVisible)
+        {
+            return false;
+        }
+
         return !collectionManager.IsCaptured(currentTarget.captureId);
+    }
+
+    private static bool HasPersistentClick(Button button, Object target, string methodName)
+    {
+        if (button == null || target == null || string.IsNullOrWhiteSpace(methodName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+        {
+            if (button.onClick.GetPersistentTarget(i) == target &&
+                button.onClick.GetPersistentMethodName(i) == methodName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -31,14 +31,19 @@ public class ARBookGameShellController : MonoBehaviour
     [Header("UI Assets")]
     public TMP_FontAsset chineseFont;
     public Sprite playerAvatarSprite;
+/*
     public string playerName = "训练家";
+*/
+/*
+    public string playerName = "训练家";
+*/
+    public string playerName = "\u8bad\u7ec3\u5bb6";
     [Range(1, 999)] public int maxHP = 100;
     [Range(0, 999)] public int currentHP = 100;
 
     [Header("Runtime")]
     public bool showCoverOnStart = true;
     public bool hideLegacyChapterHudTexts = true;
-    public bool themeExistingUiOnStart = true;
     public Canvas rootCanvas;
     public Transform companionPlacementRoot;
     [Range(1, 6)] public int maxActiveCompanions = 3;
@@ -52,12 +57,22 @@ public class ARBookGameShellController : MonoBehaviour
     public RectTransform companionRoot;
     public RectTransform companionGrid;
     public RectTransform backpackRoot;
+    public RectTransform dialogueRoot;
+    public RectTransform battleRoot;
+    public RectTransform actionButtonsRoot;
     public TMP_Text startButtonText;
     public TMP_Text questText;
     public TMP_Text progressText;
     public TMP_Text capturedCountText;
     public TMP_Text companionDetailText;
+    public TMP_Text dialogueSpeakerText;
+    public TMP_Text dialogueBodyText;
+    public TMP_Text battleMessageText;
+    public TMP_Text battleLeftHPText;
+    public TMP_Text battleRightHPText;
     public UIImage hpFill;
+    public UIImage dialogueLeftHighlight;
+    public UIImage dialogueRightHighlight;
     public Button startButton;
     public Button restartButton;
     public Button homeCompanionButton;
@@ -69,6 +84,11 @@ public class ARBookGameShellController : MonoBehaviour
     public Button clearCompanionsButton;
     public Button closeCompanionButton;
     public Button closeBackpackButton;
+    public Button dialogueContinueButton;
+    public Button battleAttackButton;
+    public Button battleExitButton;
+    public Slider battleLeftHPSlider;
+    public Slider battleRightHPSlider;
 
     private const string StartedKey = "ARBookHasStarted";
     private const string CapturedIdsKey = "CapturedIds";
@@ -81,12 +101,14 @@ public class ARBookGameShellController : MonoBehaviour
         new Dictionary<string, GameObject>();
     private float nextRefreshTime;
 
-    private static readonly Color Navy = new Color(0.04f, 0.12f, 0.20f, 0.94f);
-    private static readonly Color NavyLight = new Color(0.08f, 0.20f, 0.32f, 0.92f);
-    private static readonly Color Gold = new Color(0.95f, 0.72f, 0.28f, 1f);
-    private static readonly Color GoldDark = new Color(0.55f, 0.34f, 0.08f, 1f);
-    private static readonly Color Paper = new Color(0.98f, 0.94f, 0.82f, 1f);
-    private static readonly Color TextColor = new Color(0.96f, 0.98f, 1f, 1f);
+    public bool IsHudVisible =>
+        hudRoot != null &&
+        hudRoot.gameObject.activeInHierarchy &&
+        (homeRoot == null || !homeRoot.gameObject.activeInHierarchy) &&
+        (companionRoot == null || !companionRoot.gameObject.activeInHierarchy) &&
+        (backpackRoot == null || !backpackRoot.gameObject.activeInHierarchy) &&
+        (dialogueRoot == null || !dialogueRoot.gameObject.activeInHierarchy) &&
+        (battleRoot == null || !battleRoot.gameObject.activeInHierarchy);
 
     private void Reset()
     {
@@ -99,16 +121,17 @@ public class ARBookGameShellController : MonoBehaviour
         EnsureCatalog();
         EnsureCanvas();
         BindSceneInterface();
-        if (IsSceneInterfaceMissing())
+        if (generatedRoot == null || generatedRoot.childCount == 0)
         {
             RebuildSceneInterface();
         }
         else
         {
+            EnsureIntegratedOverlayInterface();
             WireSceneButtons();
         }
 
-        ApplyExistingUiTheme();
+        HideTransientUi();
         HideLegacyHud();
     }
 
@@ -153,6 +176,56 @@ public class ARBookGameShellController : MonoBehaviour
     {
         companions = new[]
         {
+            CreateCompanion("Bulbasaur", "Bulbasaur"),
+            CreateCompanion("Talonflame", "Talonflame"),
+            CreateCompanion("Axew", "Axew"),
+            CreateCompanion("Pikachu", "Pikachu"),
+            CreateCompanion("Meowth", "Meowth"),
+            CreateCompanion("Infernape", "Infernape"),
+            CreateCompanion("Squirtle", "Squirtle"),
+            CreateCompanion("Jirachi", "Jirachi"),
+            CreateCompanion("Sneasler", "Sneasler"),
+            CreateCompanion("Zorua", "Zorua"),
+            CreateCompanion("Zekrom", "Zekrom"),
+            CreateCompanion("Zygarde10", "Zygarde10"),
+            CreateCompanion("Toxtricity", "Toxtricity"),
+            CreateCompanion("Scizor", "Scizor"),
+            CreateCompanion("Mismagius", "Mismagius"),
+            CreateCompanion("Mew", "Mew"),
+            CreateCompanion("Manaphy", "Manaphy"),
+            CreateCompanion("ElectrodeHisuian", "ElectrodeHisuian"),
+            CreateCompanion("Dragapult", "Dragapult"),
+            CreateCompanion("Celebi", "Celebi")
+        };
+    }
+#if false
+/*
+        companions = new[]
+        {
+            CreateCompanion("Bulbasaur", "妙蛙种子"),
+            CreateCompanion("Talonflame", "烈箭鹰"),
+            CreateCompanion("Axew", "牙牙"),
+            CreateCompanion("Pikachu", "皮卡丘"),
+            CreateCompanion("Meowth", "喵喵"),
+            CreateCompanion("Infernape", "烈焰猴"),
+            CreateCompanion("Squirtle", "杰尼龟"),
+            CreateCompanion("Jirachi", "基拉祈"),
+            CreateCompanion("Sneasler", "狃拉"),
+            CreateCompanion("Zorua", "索罗亚"),
+            CreateCompanion("Zekrom", "捷克罗姆"),
+            CreateCompanion("Zygarde10", "基格尔德10%形态"),
+            CreateCompanion("Toxtricity", "颤弦蝾螈"),
+            CreateCompanion("Scizor", "巨钳螳螂"),
+            CreateCompanion("Mismagius", "梦妖魔"),
+            CreateCompanion("Mew", "梦幻"),
+            CreateCompanion("Manaphy", "玛纳霏"),
+            CreateCompanion("ElectrodeHisuian", "霹雳电球（洗翠的样子）"),
+            CreateCompanion("Dragapult", "多龙巴鲁托"),
+            CreateCompanion("Celebi", "时拉比")
+        };
+*/
+        companions = new[]
+        {
             CreateCompanion("Bulbasaur", "妙蛙种子"),
             CreateCompanion("Talonflame", "烈箭鹰"),
             CreateCompanion("Axew", "牙牙"),
@@ -176,12 +249,16 @@ public class ARBookGameShellController : MonoBehaviour
         };
     }
 
+#endif
+
     public void ShowHome()
     {
         SetRootActive(homeRoot, true);
         SetRootActive(hudRoot, false);
         SetRootActive(companionRoot, false);
         SetRootActive(backpackRoot, false);
+        HideTransientUi();
+        HideActionButtons();
         RefreshHome();
     }
 
@@ -193,6 +270,7 @@ public class ARBookGameShellController : MonoBehaviour
         SetRootActive(hudRoot, true);
         SetRootActive(companionRoot, false);
         SetRootActive(backpackRoot, false);
+        HideTransientUi();
         RefreshAll();
     }
 
@@ -221,6 +299,8 @@ public class ARBookGameShellController : MonoBehaviour
         SetRootActive(hudRoot, false);
         SetRootActive(backpackRoot, false);
         SetRootActive(companionRoot, true);
+        HideTransientUi();
+        HideActionButtons();
         selectedCompanionIds.Clear();
         BuildCompanionGrid();
         RefreshCompanionDetail();
@@ -242,12 +322,25 @@ public class ARBookGameShellController : MonoBehaviour
     public void OpenBackpack()
     {
         SetRootActive(backpackRoot, true);
+        SetRootActive(companionRoot, false);
+        HideActionButtons();
         RefreshBackpack();
     }
 
     public void CloseBackpack()
     {
         SetRootActive(backpackRoot, false);
+    }
+
+    public void ApplyDefaultUiVisibility()
+    {
+        BindSceneInterface();
+        SetRootActive(homeRoot, showCoverOnStart);
+        SetRootActive(hudRoot, !showCoverOnStart);
+        SetRootActive(companionRoot, false);
+        SetRootActive(backpackRoot, false);
+        HideTransientUi();
+        HideActionButtons();
     }
 
     public void PlaceSelectedCompanions()
@@ -404,20 +497,45 @@ public class ARBookGameShellController : MonoBehaviour
             generatedRoot = existingRoot.GetComponent<RectTransform>();
         }
 
+        bool createdGeneratedRoot = false;
         if (generatedRoot == null)
         {
             generatedRoot = CreateRect(
                 "ARBookGameShellGeneratedRoot",
                 rootCanvas.transform);
+            createdGeneratedRoot = true;
         }
 
-        Stretch(generatedRoot, 0f, 0f, 0f, 0f);
+        if (createdGeneratedRoot)
+        {
+            Stretch(generatedRoot, 0f, 0f, 0f, 0f);
+            AddEditableBackground(generatedRoot);
+        }
     }
 
     public void RebuildSceneInterface()
     {
         EnsureCanvas();
         BuildInterface();
+        BindSceneInterface();
+        WireSceneButtons();
+    }
+
+    public void EnsureIntegratedOverlayInterface()
+    {
+        EnsureCanvas();
+        BindSceneInterface();
+
+        if (dialogueRoot == null)
+        {
+            dialogueRoot = BuildDialogueOverlay();
+        }
+
+        if (battleRoot == null)
+        {
+            battleRoot = BuildBattleOverlay();
+        }
+
         BindSceneInterface();
         WireSceneButtons();
     }
@@ -429,6 +547,8 @@ public class ARBookGameShellController : MonoBehaviour
         hudRoot = BuildHud();
         companionRoot = BuildCompanionOverlay();
         backpackRoot = BuildBackpackOverlay();
+        dialogueRoot = BuildDialogueOverlay();
+        battleRoot = BuildBattleOverlay();
     }
 
     public void BindSceneInterface()
@@ -444,30 +564,54 @@ public class ARBookGameShellController : MonoBehaviour
             return;
         }
 
-        homeRoot = FindRect(generatedRoot, "Home");
-        hudRoot = FindRect(generatedRoot, "HUD");
-        companionRoot = FindRect(generatedRoot, "CompanionMode");
-        backpackRoot = FindRect(generatedRoot, "Backpack");
-        companionGrid = FindRect(companionRoot, "CompanionGrid");
-        startButton = FindButton(homeRoot, "StartButton");
-        restartButton = FindButton(homeRoot, "RestartButton");
-        homeCompanionButton = FindButton(homeRoot, "CompanionButton");
-        backpackButton = FindButton(hudRoot, "BackpackButton");
-        hudCompanionButton = FindButton(hudRoot, "CompanionButton");
-        homeButton = FindButton(hudRoot, "HomeButton");
-        placeButton = FindButton(companionRoot, "PlaceButton");
-        affectionButton = FindButton(companionRoot, "AffectionButton");
-        clearCompanionsButton = FindButton(companionRoot, "ClearButton");
-        closeCompanionButton = FindButton(companionRoot, "CloseButton");
-        closeBackpackButton = FindButton(backpackRoot, "CloseButton");
+        homeRoot = FindRect(generatedRoot, "Home") ?? homeRoot;
+        hudRoot = FindRect(generatedRoot, "HUD") ?? hudRoot;
+        companionRoot = FindRect(generatedRoot, "CompanionMode") ?? companionRoot;
+        backpackRoot = FindRect(generatedRoot, "Backpack") ?? backpackRoot;
+        dialogueRoot = FindRect(generatedRoot, "DialoguePanel", "DialogueCanvas", "DialogueBox") ?? dialogueRoot;
+        battleRoot = FindRect(generatedRoot, "BattlePanel", "BattleCanvas", "BattleControls") ?? battleRoot;
+        companionGrid = FindRect(companionRoot, "CompanionGrid") ?? companionGrid;
+        startButton = FindButton(homeRoot, "StartButton") ?? startButton;
+        restartButton = FindButton(homeRoot, "RestartButton") ?? restartButton;
+        homeCompanionButton = FindButton(homeRoot, "CompanionButton", "HomeCompanionButton") ?? homeCompanionButton;
+        backpackButton = FindButton(hudRoot, "BackpackButton", "BagButton") ?? backpackButton;
+        hudCompanionButton = FindButton(hudRoot, "CompanionButton", "HUDCompanionButton") ?? hudCompanionButton;
+        homeButton = FindButton(hudRoot, "HomeButton") ?? homeButton;
+        placeButton = FindButton(companionRoot, "PlaceButton") ?? placeButton;
+        affectionButton = FindButton(companionRoot, "AffectionButton", "InteractButton") ?? affectionButton;
+        clearCompanionsButton = FindButton(companionRoot, "ClearButton", "ClearCompanionsButton") ?? clearCompanionsButton;
+        closeCompanionButton = FindButton(companionRoot, "CloseButton", "CloseCompanionButton") ?? closeCompanionButton;
+        closeBackpackButton = FindButton(backpackRoot, "CloseButton", "CloseBackpackButton") ?? closeBackpackButton;
+        dialogueContinueButton = FindButton(dialogueRoot, "ContinueButton", "NextButton") ?? dialogueContinueButton;
+        battleAttackButton = FindButton(battleRoot, "AttackButton") ?? battleAttackButton;
+        battleExitButton = FindButton(battleRoot, "ExitButton", "CloseButton") ?? battleExitButton;
         startButtonText = startButton != null
             ? startButton.GetComponentInChildren<TMP_Text>(true)
             : null;
-        questText = FindText(hudRoot, "QuestText");
-        progressText = FindText(hudRoot, "ProgressText");
-        capturedCountText = FindText(backpackRoot, "BackpackText");
-        companionDetailText = FindText(companionRoot, "DetailText");
-        hpFill = FindComponentInNamedChild<UIImage>(hudRoot, "HPFill");
+        questText = FindText(hudRoot, "QuestText") ?? questText;
+        progressText = FindText(hudRoot, "ProgressText") ?? progressText;
+        capturedCountText = FindText(backpackRoot, "BackpackText") ?? capturedCountText;
+        companionDetailText = FindText(companionRoot, "DetailText") ?? companionDetailText;
+        dialogueSpeakerText = FindText(dialogueRoot, "SpeakerNameText", "SpeakerName") ?? dialogueSpeakerText;
+        dialogueBodyText = FindText(dialogueRoot, "DialogueText") ?? dialogueBodyText;
+        battleMessageText = FindText(battleRoot, "BattleMessageText", "MessageText") ?? battleMessageText;
+        battleLeftHPText = FindText(battleRoot, "LeftHPText", "EnemyHPText") ?? battleLeftHPText;
+        battleRightHPText = FindText(battleRoot, "RightHPText", "PlayerHPText") ?? battleRightHPText;
+        hpFill = FindComponentInNamedChild<UIImage>(hudRoot, "HPFill") ?? hpFill;
+        dialogueLeftHighlight = FindComponentInNamedChild<UIImage>(
+            dialogueRoot,
+            "LeftSpeakerHighlight") ?? dialogueLeftHighlight;
+        dialogueRightHighlight = FindComponentInNamedChild<UIImage>(
+            dialogueRoot,
+            "RightSpeakerHighlight") ?? dialogueRightHighlight;
+        battleLeftHPSlider = FindComponentInNamedChild<Slider>(
+            battleRoot,
+            "LeftHPSlider",
+            "EnemyHPSlider") ?? battleLeftHPSlider;
+        battleRightHPSlider = FindComponentInNamedChild<Slider>(
+            battleRoot,
+            "RightHPSlider",
+            "PlayerHPSlider") ?? battleRightHPSlider;
     }
 
     private bool IsSceneInterfaceMissing()
@@ -504,14 +648,39 @@ public class ARBookGameShellController : MonoBehaviour
         }
 
         button.onClick.RemoveListener(action);
+        if (HasPersistentClick(button, action))
+        {
+            return;
+        }
+
         button.onClick.AddListener(action);
+    }
+
+    private static bool HasPersistentClick(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null || action == null)
+        {
+            return false;
+        }
+
+        object target = action.Target;
+        string methodName = action.Method != null ? action.Method.Name : string.Empty;
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+        {
+            if (button.onClick.GetPersistentTarget(i) == target &&
+                button.onClick.GetPersistentMethodName(i) == methodName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private RectTransform BuildHome()
     {
         RectTransform root = CreateFullRoot("Home");
-        UIImage shade = root.gameObject.AddComponent<UIImage>();
-        shade.color = new Color(0.01f, 0.03f, 0.06f, 0.88f);
+        AddEditableBackground(root);
 
         RectTransform panel = CreatePanel(
             "HomePanel",
@@ -519,8 +688,65 @@ public class ARBookGameShellController : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
             new Vector2(760f, 620f));
-        AddVerticalLayout(panel, 20f, 36, 36, 34, 34);
 
+        TMP_Text title = CreateText(
+            "Title",
+            panel,
+            "AR Book Adventure",
+            48,
+            FontStyles.Bold,
+            TextAlignmentOptions.Center);
+        SetAnchors(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        title.rectTransform.sizeDelta = new Vector2(690f, 110f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -76f);
+
+        TMP_Text subtitle = CreateText(
+            "Subtitle",
+            panel,
+            "Open the camera, turn the book pages, explore maps, and capture creatures.",
+            24,
+            FontStyles.Normal,
+            TextAlignmentOptions.Center);
+        SetAnchors(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        subtitle.rectTransform.sizeDelta = new Vector2(690f, 74f);
+        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -176f);
+
+        Button start = CreateButton("StartButton", panel, "Start", 32);
+        startButtonText = start.GetComponentInChildren<TMP_Text>();
+        SetButtonRect(start, new Vector2(0f, -275f), new Vector2(560f, 76f));
+
+        Button restart = CreateButton("RestartButton", panel, "Restart", 28);
+        SetButtonRect(restart, new Vector2(0f, -365f), new Vector2(560f, 70f));
+
+        Button companion = CreateButton("CompanionButton", panel, "Companion", 28);
+        SetButtonRect(companion, new Vector2(0f, -445f), new Vector2(560f, 70f));
+
+        TMP_Text footer = CreateText(
+            "Footer",
+            panel,
+            "Keep the book page in camera view. Recognized maps enable movement, interaction, and capture.",
+            21,
+            FontStyles.Normal,
+            TextAlignmentOptions.Center);
+        SetAnchors(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+        footer.rectTransform.sizeDelta = new Vector2(690f, 88f);
+        footer.rectTransform.anchoredPosition = new Vector2(0f, 64f);
+        return root;
+    }
+
+#if false
+    private RectTransform BuildHomeDisabled()
+    {
+        RectTransform root = CreateFullRoot("Home");
+        UIImage shade = root.gameObject.AddComponent<UIImage>();
+        shade.raycastTarget = false;
+
+        RectTransform panel = CreatePanel(
+            "HomePanel",
+            root,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(760f, 620f));
         TMP_Text title = CreateText(
             "Title",
             panel,
@@ -528,7 +754,9 @@ public class ARBookGameShellController : MonoBehaviour
             48,
             FontStyles.Bold,
             TextAlignmentOptions.Center);
-        SetLayout(title.rectTransform, 110f);
+        SetAnchors(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        title.rectTransform.sizeDelta = new Vector2(690f, 110f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -76f);
 
         TMP_Text subtitle = CreateText(
             "Subtitle",
@@ -537,18 +765,19 @@ public class ARBookGameShellController : MonoBehaviour
             24,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
-        subtitle.color = Paper;
-        SetLayout(subtitle.rectTransform, 74f);
+        SetAnchors(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        subtitle.rectTransform.sizeDelta = new Vector2(690f, 74f);
+        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -176f);
 
         Button startButton = CreateButton("StartButton", panel, "开始游戏", 32);
         startButtonText = startButton.GetComponentInChildren<TMP_Text>();
-        SetLayout(startButton.GetComponent<RectTransform>(), 76f);
+        SetButtonRect(startButton, new Vector2(0f, -275f), new Vector2(560f, 76f));
 
         Button restartButton = CreateButton("RestartButton", panel, "清空存档 / 重新开始", 28);
-        SetLayout(restartButton.GetComponent<RectTransform>(), 70f);
+        SetButtonRect(restartButton, new Vector2(0f, -365f), new Vector2(560f, 70f));
 
         Button companionButton = CreateButton("CompanionButton", panel, "陪伴模式", 28);
-        SetLayout(companionButton.GetComponent<RectTransform>(), 70f);
+        SetButtonRect(companionButton, new Vector2(0f, -445f), new Vector2(560f, 70f));
 
         TMP_Text footer = CreateText(
             "Footer",
@@ -557,14 +786,18 @@ public class ARBookGameShellController : MonoBehaviour
             21,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
-        footer.color = new Color(0.84f, 0.90f, 0.96f, 1f);
-        SetLayout(footer.rectTransform, 88f);
+        SetAnchors(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+        footer.rectTransform.sizeDelta = new Vector2(690f, 88f);
+        footer.rectTransform.anchoredPosition = new Vector2(0f, 64f);
         return root;
     }
+
+#endif
 
     private RectTransform BuildHud()
     {
         RectTransform root = CreateFullRoot("HUD");
+        AddEditableBackground(root);
 
         RectTransform status = CreatePanel(
             "PlayerStatus",
@@ -579,7 +812,106 @@ public class ARBookGameShellController : MonoBehaviour
         SetAnchors(avatarRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
         avatarRect.sizeDelta = new Vector2(88f, 88f);
         avatarRect.anchoredPosition = new Vector2(62f, 0f);
-        AddOutline(avatar.gameObject, Gold, new Vector2(3f, -3f));
+
+        TMP_Text nameText = CreateText(
+            "PlayerName",
+            status,
+            playerName,
+            28,
+            FontStyles.Bold,
+            TextAlignmentOptions.Left);
+        SetAnchors(nameText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f));
+        nameText.rectTransform.offsetMin = new Vector2(122f, -56f);
+        nameText.rectTransform.offsetMax = new Vector2(-26f, -18f);
+
+        RectTransform hpBack = CreateRect("HPBack", status);
+        SetAnchors(hpBack, new Vector2(0f, 0f), new Vector2(1f, 0f));
+        hpBack.offsetMin = new Vector2(122f, 28f);
+        hpBack.offsetMax = new Vector2(-26f, 58f);
+        hpBack.gameObject.AddComponent<UIImage>().raycastTarget = false;
+
+        hpFill = CreateImage("HPFill", hpBack, null);
+        SetAnchors(hpFill.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f));
+        hpFill.rectTransform.offsetMin = new Vector2(4f, 4f);
+        hpFill.rectTransform.offsetMax = new Vector2(-4f, -4f);
+
+        RectTransform taskPanel = CreatePanel(
+            "TaskPanel",
+            root,
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(520f, 270f));
+        taskPanel.anchoredPosition = new Vector2(-28f, -28f);
+
+        questText = CreateText(
+            "QuestText",
+            taskPanel,
+            "Waiting for map page",
+            25,
+            FontStyles.Bold,
+            TextAlignmentOptions.TopLeft);
+        SetAnchors(questText.rectTransform, new Vector2(0f, 0.38f), new Vector2(1f, 1f));
+        questText.rectTransform.offsetMin = new Vector2(28f, 10f);
+        questText.rectTransform.offsetMax = new Vector2(-28f, -22f);
+
+        progressText = CreateText(
+            "ProgressText",
+            taskPanel,
+            string.Empty,
+            20,
+            FontStyles.Normal,
+            TextAlignmentOptions.BottomLeft);
+        SetAnchors(progressText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.36f));
+        progressText.rectTransform.offsetMin = new Vector2(28f, 18f);
+        progressText.rectTransform.offsetMax = new Vector2(-28f, -8f);
+
+        RectTransform buttons = CreateRect("HUDButtons", root);
+        SetAnchors(buttons, new Vector2(1f, 0f), new Vector2(1f, 0f));
+        buttons.sizeDelta = new Vector2(620f, 88f);
+        buttons.anchoredPosition = new Vector2(-28f, 34f);
+        AddEditableBackground(buttons);
+        CreateButton("BackpackButton", buttons, "Bag", 24);
+        CreateButton("CompanionButton", buttons, "Companion", 24);
+        CreateButton("HomeButton", buttons, "Home", 24);
+
+        RectTransform hint = CreatePanel(
+            "CameraHint",
+            root,
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(760f, 56f));
+        hint.anchoredPosition = new Vector2(0f, 30f);
+        TMP_Text hintText = CreateText(
+            "HintText",
+            hint,
+            "Keep the page visible, then tap the walkable ground to move.",
+            20,
+            FontStyles.Normal,
+            TextAlignmentOptions.Center);
+        Stretch(hintText.rectTransform, 18f, 6f, 18f, 6f);
+        return root;
+    }
+
+#if false
+    private RectTransform BuildHudDisabled()
+    {
+        RectTransform root = CreateFullRoot("HUD");
+        UIImage background = root.gameObject.AddComponent<UIImage>();
+        background.raycastTarget = false;
+
+        RectTransform status = CreatePanel(
+            "PlayerStatus",
+            root,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(460f, 132f));
+        status.anchoredPosition = new Vector2(28f, -28f);
+
+        UIImage avatar = CreateImage("Avatar", status, playerAvatarSprite);
+        RectTransform avatarRect = avatar.rectTransform;
+        SetAnchors(avatarRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+        avatarRect.sizeDelta = new Vector2(88f, 88f);
+        avatarRect.anchoredPosition = new Vector2(62f, 0f);
 
         TMP_Text nameText = CreateText(
             "PlayerName",
@@ -597,14 +929,11 @@ public class ARBookGameShellController : MonoBehaviour
         hpBack.offsetMin = new Vector2(122f, 28f);
         hpBack.offsetMax = new Vector2(-26f, 58f);
         UIImage hpBackImage = hpBack.gameObject.AddComponent<UIImage>();
-        hpBackImage.color = new Color(0.02f, 0.05f, 0.07f, 0.95f);
-        AddOutline(hpBack.gameObject, GoldDark, new Vector2(2f, -2f));
 
         hpFill = CreateImage("HPFill", hpBack, null);
         SetAnchors(hpFill.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f));
         hpFill.rectTransform.offsetMin = new Vector2(4f, 4f);
         hpFill.rectTransform.offsetMax = new Vector2(-4f, -4f);
-        hpFill.color = new Color(0.25f, 0.90f, 0.15f, 1f);
 
         RectTransform taskPanel = CreatePanel(
             "TaskPanel",
@@ -632,7 +961,6 @@ public class ARBookGameShellController : MonoBehaviour
             20,
             FontStyles.Normal,
             TextAlignmentOptions.BottomLeft);
-        progressText.color = Paper;
         SetAnchors(progressText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.36f));
         progressText.rectTransform.offsetMin = new Vector2(28f, 18f);
         progressText.rectTransform.offsetMax = new Vector2(-28f, -8f);
@@ -641,14 +969,14 @@ public class ARBookGameShellController : MonoBehaviour
         SetAnchors(buttons, new Vector2(1f, 0f), new Vector2(1f, 0f));
         buttons.sizeDelta = new Vector2(620f, 88f);
         buttons.anchoredPosition = new Vector2(-28f, 34f);
-        HorizontalLayoutGroup layout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 16f;
-        layout.childForceExpandHeight = true;
-        layout.childForceExpandWidth = true;
-
+        AddEditableBackground(buttons);
         Button backpackButton = CreateButton("BackpackButton", buttons, "背包", 24);
         Button companionButton = CreateButton("CompanionButton", buttons, "陪伴", 24);
         Button homeButton = CreateButton("HomeButton", buttons, "首页", 24);
+
+        SetButtonRect(backpackButton, new Vector2(-210f, 0f), new Vector2(190f, 68f));
+        SetButtonRect(companionButton, new Vector2(0f, 0f), new Vector2(190f, 68f));
+        SetButtonRect(homeButton, new Vector2(210f, 0f), new Vector2(190f, 68f));
 
         RectTransform hint = CreatePanel(
             "CameraHint",
@@ -669,11 +997,13 @@ public class ARBookGameShellController : MonoBehaviour
         return root;
     }
 
+#endif
+
     private RectTransform BuildCompanionOverlay()
     {
         RectTransform root = CreateFullRoot("CompanionMode");
         UIImage shade = root.gameObject.AddComponent<UIImage>();
-        shade.color = new Color(0f, 0f, 0f, 0.72f);
+        shade.raycastTarget = false;
 
         RectTransform panel = CreatePanel(
             "CompanionPanel",
@@ -697,11 +1027,7 @@ public class ARBookGameShellController : MonoBehaviour
         SetAnchors(companionGrid, new Vector2(0f, 0f), new Vector2(0.68f, 0.86f));
         companionGrid.offsetMin = new Vector2(38f, 116f);
         companionGrid.offsetMax = new Vector2(-18f, -92f);
-        GridLayoutGroup grid = companionGrid.gameObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(178f, 210f);
-        grid.spacing = new Vector2(18f, 18f);
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 4;
+        AddEditableBackground(companionGrid);
 
         RectTransform detail = CreatePanel(
             "CompanionDetail",
@@ -719,17 +1045,15 @@ public class ARBookGameShellController : MonoBehaviour
             24,
             FontStyles.Normal,
             TextAlignmentOptions.TopLeft);
-        Stretch(companionDetailText.rectTransform, 24f, 24f, 24f, 24f);
+        SetAnchors(companionDetailText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        companionDetailText.rectTransform.sizeDelta = new Vector2(340f, 440f);
+        companionDetailText.rectTransform.anchoredPosition = Vector2.zero;
 
         RectTransform actions = CreateRect("Actions", panel);
         SetAnchors(actions, new Vector2(0f, 0f), new Vector2(1f, 0f));
         actions.offsetMin = new Vector2(38f, 30f);
         actions.offsetMax = new Vector2(-38f, 98f);
-        HorizontalLayoutGroup layout = actions.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 16f;
-        layout.childForceExpandHeight = true;
-        layout.childForceExpandWidth = true;
-
+        AddEditableBackground(actions);
         Button placeButton = CreateButton("PlaceButton", actions, "放置选中", 24);
         Button affectionButton = CreateButton("AffectionButton", actions, "互动 + 好感", 24);
         Button clearButton = CreateButton("ClearButton", actions, "收回全部", 24);
@@ -742,7 +1066,7 @@ public class ARBookGameShellController : MonoBehaviour
     {
         RectTransform root = CreateFullRoot("Backpack");
         UIImage shade = root.gameObject.AddComponent<UIImage>();
-        shade.color = new Color(0f, 0f, 0f, 0.58f);
+        shade.raycastTarget = false;
 
         RectTransform panel = CreatePanel(
             "BackpackPanel",
@@ -750,8 +1074,6 @@ public class ARBookGameShellController : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
             new Vector2(760f, 520f));
-        AddVerticalLayout(panel, 18f, 30, 30, 30, 30);
-
         TMP_Text title = CreateText(
             "Title",
             panel,
@@ -759,7 +1081,9 @@ public class ARBookGameShellController : MonoBehaviour
             36,
             FontStyles.Bold,
             TextAlignmentOptions.Center);
-        SetLayout(title.rectTransform, 64f);
+        SetAnchors(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        title.rectTransform.sizeDelta = new Vector2(690f, 64f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
 
         capturedCountText = CreateText(
             "BackpackText",
@@ -768,12 +1092,182 @@ public class ARBookGameShellController : MonoBehaviour
             24,
             FontStyles.Normal,
             TextAlignmentOptions.TopLeft);
-        SetLayout(capturedCountText.rectTransform, 300f);
+        SetAnchors(capturedCountText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        capturedCountText.rectTransform.sizeDelta = new Vector2(690f, 300f);
+        capturedCountText.rectTransform.anchoredPosition = new Vector2(0f, 10f);
 
         Button closeButton = CreateButton("CloseButton", panel, "关闭", 24);
-        SetLayout(closeButton.GetComponent<RectTransform>(), 70f);
+        SetButtonRect(closeButton, new Vector2(0f, -190f), new Vector2(420f, 70f));
 
         return root;
+    }
+
+    private RectTransform BuildDialogueOverlay()
+    {
+        RectTransform root = CreateFullRoot("DialoguePanel");
+        AddEditableBackground(root);
+
+        RectTransform panel = CreatePanel(
+            "DialogueBox",
+            root,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            Vector2.zero);
+        panel.offsetMin = new Vector2(80f, 42f);
+        panel.offsetMax = new Vector2(-80f, 292f);
+
+        dialogueLeftHighlight = CreateImage("LeftSpeakerHighlight", panel, null);
+        SetAnchors(dialogueLeftHighlight.rectTransform, new Vector2(0f, 0f), new Vector2(0.08f, 1f));
+        dialogueLeftHighlight.rectTransform.offsetMin = new Vector2(18f, 18f);
+        dialogueLeftHighlight.rectTransform.offsetMax = new Vector2(-10f, -18f);
+
+        dialogueRightHighlight = CreateImage("RightSpeakerHighlight", panel, null);
+        SetAnchors(dialogueRightHighlight.rectTransform, new Vector2(0.92f, 0f), new Vector2(1f, 1f));
+        dialogueRightHighlight.rectTransform.offsetMin = new Vector2(10f, 18f);
+        dialogueRightHighlight.rectTransform.offsetMax = new Vector2(-18f, -18f);
+
+        dialogueSpeakerText = CreateText(
+            "SpeakerNameText",
+            panel,
+            "Speaker",
+            28,
+            FontStyles.Bold,
+            TextAlignmentOptions.Left);
+        SetAnchors(dialogueSpeakerText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f));
+        dialogueSpeakerText.rectTransform.offsetMin = new Vector2(120f, -72f);
+        dialogueSpeakerText.rectTransform.offsetMax = new Vector2(-220f, -18f);
+
+        dialogueBodyText = CreateText(
+            "DialogueText",
+            panel,
+            "Dialogue text",
+            24,
+            FontStyles.Normal,
+            TextAlignmentOptions.TopLeft);
+        SetAnchors(dialogueBodyText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f));
+        dialogueBodyText.rectTransform.offsetMin = new Vector2(120f, 34f);
+        dialogueBodyText.rectTransform.offsetMax = new Vector2(-220f, -84f);
+
+        dialogueContinueButton = CreateButton("ContinueButton", panel, "Continue", 23);
+        SetButtonRect(dialogueContinueButton, new Vector2(0f, 0f), new Vector2(180f, 62f));
+        RectTransform buttonRect = dialogueContinueButton.GetComponent<RectTransform>();
+        SetAnchors(buttonRect, new Vector2(1f, 0f), new Vector2(1f, 0f));
+        buttonRect.anchoredPosition = new Vector2(-122f, 64f);
+
+        root.gameObject.SetActive(false);
+        return root;
+    }
+
+    private RectTransform BuildBattleOverlay()
+    {
+        RectTransform root = CreateFullRoot("BattlePanel");
+        AddEditableBackground(root);
+
+        RectTransform leftStatus = CreateBattleStatusPanel(
+            "EnemyStatus",
+            root,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(370f, -110f),
+            "Enemy",
+            out battleLeftHPSlider,
+            out battleLeftHPText);
+
+        RectTransform rightStatus = CreateBattleStatusPanel(
+            "PlayerStatusBattle",
+            root,
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(-370f, -110f),
+            "Player",
+            out battleRightHPSlider,
+            out battleRightHPText);
+
+        RectTransform controls = CreatePanel(
+            "BattleControls",
+            root,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            Vector2.zero);
+        controls.offsetMin = new Vector2(72f, 32f);
+        controls.offsetMax = new Vector2(-72f, 178f);
+
+        battleMessageText = CreateText(
+            "BattleMessageText",
+            controls,
+            "Choose action",
+            26,
+            FontStyles.Bold,
+            TextAlignmentOptions.Left);
+        SetAnchors(battleMessageText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f));
+        battleMessageText.rectTransform.offsetMin = new Vector2(40f, 24f);
+        battleMessageText.rectTransform.offsetMax = new Vector2(-560f, -24f);
+
+        battleAttackButton = CreateButton("AttackButton", controls, "Attack", 32);
+        SetButtonRect(battleAttackButton, new Vector2(0f, 0f), new Vector2(310f, 92f));
+        RectTransform attackRect = battleAttackButton.GetComponent<RectTransform>();
+        SetAnchors(attackRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        attackRect.anchoredPosition = new Vector2(260f, 0f);
+
+        battleExitButton = CreateButton("ExitButton", controls, "Exit", 24);
+        SetButtonRect(battleExitButton, new Vector2(0f, 0f), new Vector2(180f, 66f));
+        RectTransform exitRect = battleExitButton.GetComponent<RectTransform>();
+        SetAnchors(exitRect, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
+        exitRect.anchoredPosition = new Vector2(-120f, 0f);
+
+        leftStatus.gameObject.SetActive(true);
+        rightStatus.gameObject.SetActive(true);
+        root.gameObject.SetActive(false);
+        return root;
+    }
+
+    private RectTransform CreateBattleStatusPanel(
+        string name,
+        Transform parent,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 position,
+        string title,
+        out Slider slider,
+        out TMP_Text hpText)
+    {
+        RectTransform panel = CreatePanel(
+            name,
+            parent,
+            anchorMin,
+            anchorMax,
+            new Vector2(560f, 150f));
+        panel.anchoredPosition = position;
+
+        TMP_Text nameText = CreateText(
+            "NameText",
+            panel,
+            title,
+            28,
+            FontStyles.Bold,
+            TextAlignmentOptions.Left);
+        SetAnchors(nameText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f));
+        nameText.rectTransform.offsetMin = new Vector2(30f, -62f);
+        nameText.rectTransform.offsetMax = new Vector2(-30f, -18f);
+
+        slider = CreateEditableSlider(name.Contains("Enemy") ? "LeftHPSlider" : "RightHPSlider", panel);
+        RectTransform sliderRect = slider.GetComponent<RectTransform>();
+        SetAnchors(sliderRect, new Vector2(0f, 0f), new Vector2(1f, 0f));
+        sliderRect.offsetMin = new Vector2(30f, 48f);
+        sliderRect.offsetMax = new Vector2(-30f, 82f);
+
+        hpText = CreateText(
+            name.Contains("Enemy") ? "LeftHPText" : "RightHPText",
+            panel,
+            "HP",
+            24,
+            FontStyles.Bold,
+            TextAlignmentOptions.Right);
+        SetAnchors(hpText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f));
+        hpText.rectTransform.offsetMin = new Vector2(30f, 10f);
+        hpText.rectTransform.offsetMax = new Vector2(-30f, 44f);
+
+        return panel;
     }
 
     private void RefreshAll()
@@ -793,8 +1287,24 @@ public class ARBookGameShellController : MonoBehaviour
         bool hasStarted = PlayerPrefs.GetInt(StartedKey, 0) == 1 ||
                           GetCapturedIds().Count > 0 ||
                           HasAnyCompletedChapter();
+        startButtonText.text = hasStarted ? "Continue" : "Start";
+    }
+
+#if false
+    private void RefreshHomeDisabled()
+    {
+        if (startButtonText == null)
+        {
+            return;
+        }
+
+        bool hasStarted = PlayerPrefs.GetInt(StartedKey, 0) == 1 ||
+                          GetCapturedIds().Count > 0 ||
+                          HasAnyCompletedChapter();
         startButtonText.text = hasStarted ? "继续游戏" : "开始游戏";
     }
+
+#endif
 
     private void RefreshHud()
     {
@@ -857,7 +1367,44 @@ public class ARBookGameShellController : MonoBehaviour
                 continue;
             }
 
-            CreateCompanionCard(definition);
+            CreateCompanionCard(definition, visibleCount);
+            visibleCount++;
+        }
+
+        if (visibleCount == 0)
+        {
+            TMP_Text empty = CreateText(
+                "Empty",
+                companionGrid,
+                "\u8fd8\u6ca1\u6709\u5df2\u6536\u670d\u7684\u7cbe\u7075",
+                24,
+                FontStyles.Normal,
+                TextAlignmentOptions.Center);
+            SetAnchors(empty.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            empty.rectTransform.sizeDelta = new Vector2(520f, 180f);
+            empty.rectTransform.anchoredPosition = Vector2.zero;
+        }
+    }
+
+#if false
+    private void BuildCompanionGridDisabled()
+    {
+        if (companionGrid == null)
+        {
+            return;
+        }
+
+        ClearChildren(companionGrid);
+        int visibleCount = 0;
+        for (int i = 0; i < companions.Length; i++)
+        {
+            CompanionDefinition definition = companions[i];
+            if (definition == null || !IsCaptured(definition.captureId))
+            {
+                continue;
+            }
+
+            CreateCompanionCard(definition, visibleCount);
             visibleCount++;
         }
 
@@ -870,11 +1417,15 @@ public class ARBookGameShellController : MonoBehaviour
                 24,
                 FontStyles.Normal,
                 TextAlignmentOptions.Center);
-            SetLayout(empty.rectTransform, 180f);
+            SetAnchors(empty.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            empty.rectTransform.sizeDelta = new Vector2(520f, 180f);
+            empty.rectTransform.anchoredPosition = Vector2.zero;
         }
     }
 
-    private void CreateCompanionCard(CompanionDefinition definition)
+#endif
+
+    private void CreateCompanionCard(CompanionDefinition definition, int index)
     {
         RectTransform card = CreatePanel(
             $"Card_{definition.captureId}",
@@ -882,8 +1433,20 @@ public class ARBookGameShellController : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
             new Vector2(178f, 210f));
+        int column = index % 4;
+        int row = index / 4;
+        card.anchoredPosition = new Vector2(
+            -300f + column * 196f,
+            180f - row * 228f);
+        UIImage cardImage = card.GetComponent<UIImage>();
+        if (cardImage != null)
+        {
+            cardImage.raycastTarget = true;
+        }
+
         Button button = card.gameObject.AddComponent<Button>();
-        button.targetGraphic = card.GetComponent<UIImage>();
+        button.targetGraphic = cardImage;
+        button.transition = Selectable.Transition.None;
         string captureId = definition.captureId;
         button.onClick.AddListener(() => ToggleCompanionSelection(captureId));
 
@@ -913,15 +1476,10 @@ public class ARBookGameShellController : MonoBehaviour
             17,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
-        affectionText.color = Paper;
         SetAnchors(affectionText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f));
         affectionText.rectTransform.offsetMin = new Vector2(10f, 14f);
         affectionText.rectTransform.offsetMax = new Vector2(-10f, 40f);
-
-        if (selectedCompanionIds.Contains(definition.captureId))
-        {
-            AddOutline(card.gameObject, Color.white, new Vector2(4f, -4f));
-        }
+        DisableChildRaycasts(card, card.GetComponent<Graphic>());
     }
 
     private void ToggleCompanionSelection(string captureId)
@@ -949,6 +1507,35 @@ public class ARBookGameShellController : MonoBehaviour
         if (selectedCompanionIds.Count == 0)
         {
             companionDetailText.text =
+                "\u9009\u62e9\u4e00\u4e2a\u6216\u591a\u4e2a\u5df2\u6536\u670d\u7684\u7cbe\u7075\u3002\n\n" +
+                "\u653e\u7f6e\uff1a\u628a\u9009\u4e2d\u7cbe\u7075\u653e\u5230\u6444\u50cf\u673a\u89c6\u91ce\u91cc\u3002\n" +
+                "\u4e92\u52a8\uff1a\u63d0\u5347\u9009\u4e2d\u7cbe\u7075\u7684\u597d\u611f\u5ea6\u3002";
+            return;
+        }
+
+        string text = "\u5df2\u9009\u62e9\uff1a\n";
+        foreach (string captureId in selectedCompanionIds)
+        {
+            CompanionDefinition definition = FindCompanion(captureId);
+            string display = definition != null ? definition.displayName : captureId;
+            text += $"- {display}  \u597d\u611f {GetAffection(captureId)}\n";
+        }
+
+        text += $"\n\u5df2\u653e\u7f6e\uff1a{placedCompanions.Count} / {maxActiveCompanions}";
+        companionDetailText.text = text;
+    }
+
+#if false
+    private void RefreshCompanionDetailDisabled()
+    {
+        if (companionDetailText == null)
+        {
+            return;
+        }
+
+        if (selectedCompanionIds.Count == 0)
+        {
+            companionDetailText.text =
                 "选择一个或多个已收服精灵。\n\n" +
                 "放置：把模型生成到相机前方或你配置的放置根节点下。\n" +
                 "互动：提升好感度，后续可以接动画或事件。";
@@ -966,6 +1553,8 @@ public class ARBookGameShellController : MonoBehaviour
         text += $"\n当前场上：{placedCompanions.Count} / {maxActiveCompanions}";
         companionDetailText.text = text;
     }
+
+#endif
 
     private GameObject CreateCompanionInstance(CompanionDefinition definition, int index)
     {
@@ -1006,6 +1595,153 @@ public class ARBookGameShellController : MonoBehaviour
         if (tracker != null)
         {
             tracker.RefreshUI();
+            return BuildQuestTrackerText(tracker);
+        }
+
+        ARBookChapterObjectiveManager objective = FindActiveObjectiveManager();
+        if (objective != null)
+        {
+            objective.RefreshUI();
+            int count = Mathf.Min(
+                objective.CollectedCount,
+                objective.requiredCollectibleCount);
+            string state = objective.IsObjectiveCompleted
+                ? "\u5df2\u5b8c\u6210"
+                : $"{count} / {objective.requiredCollectibleCount}";
+            return $"\u5730\u56fe {objective.chapterId}\n[\u5f53\u524d] \u4efb\u52a1\u8fdb\u5ea6\uff1a{state}";
+        }
+
+        ARBookChallenge challenge = FindActiveChallenge();
+        if (challenge != null)
+        {
+            return challenge.IsCompleted
+                ? $"\u5730\u56fe {challenge.chapterId}\n[\u5b8c\u6210] \u673a\u5173\u5df2\u5b8c\u6210\uff0c\u5bfb\u627e\u5e76\u6536\u670d\u8fd9\u5f20\u5730\u56fe\u7684\u7cbe\u7075"
+                : $"\u5730\u56fe {challenge.chapterId}\n[\u5f53\u524d] \u5b8c\u6210\u5730\u56fe\u673a\u5173\uff0c\u5e76\u5bfb\u627e\u53ef\u4ee5\u6536\u670d\u7684\u7cbe\u7075";
+        }
+
+        int activeMap = DetectActiveChapter();
+        if (activeMap > 0)
+        {
+            return $"\u5730\u56fe {activeMap}\n[\u5f53\u524d] \u63a2\u7d22\u5730\u56fe\uff0c\u5bfb\u627e\u53ef\u4ee5\u5bf9\u8bdd\u548c\u6536\u670d\u7684\u7cbe\u7075";
+        }
+
+        return "\u7b49\u5f85\u8bc6\u522b\u5730\u56fe\u4e66\u9875\n[\u5f53\u524d] \u7ffb\u5f00\u4efb\u610f\u5730\u56fe\u56fe\u7247\u5f00\u59cb\u5192\u9669";
+    }
+
+    private string BuildProgressText()
+    {
+        int currentChapter = DetectActiveChapter();
+        int completed = GetCompletedChapterCount();
+        string current = currentChapter > 0
+            ? $"\u5f53\u524d\u5730\u56fe\uff1a{currentChapter} / 5"
+            : "\u5f53\u524d\u5730\u56fe\uff1a\u672a\u8bc6\u522b";
+        return $"{current}\n\u5df2\u63a2\u7d22\u5730\u56fe\uff1a{completed} / 5\n\u8bc6\u522b\u4e66\u9875\u540e\uff0c\u4efb\u52a1\u680f\u4f1a\u81ea\u52a8\u66f4\u65b0\u3002";
+    }
+
+    private string BuildQuestTrackerText(ARBookQuestTracker tracker)
+    {
+        string title = tracker.chapterId == 1
+            ? "\u7b2c\u4e00\u7ae0\uff1a\u68ee\u6797\u521d\u9047"
+            : $"\u5730\u56fe {tracker.chapterId}";
+
+        string stepText;
+        switch (tracker.CurrentStep)
+        {
+            case ARBookQuestTracker.QuestStep.TalkToMentor:
+                stepText = "\u4e0e\u5bfc\u5e08\u4ea4\u8c08";
+                break;
+            case ARBookQuestTracker.QuestStep.CollectFragments:
+                stepText = BuildCollectFragmentsText(tracker);
+                break;
+            case ARBookQuestTracker.QuestStep.TalkToCreature:
+                stepText = $"\u4e0e {GetTrackerCreatureName(tracker)} \u4ea4\u8c08";
+                break;
+            case ARBookQuestTracker.QuestStep.CaptureCreature:
+                stepText = $"\u6536\u670d {GetTrackerCreatureName(tracker)}";
+                break;
+            case ARBookQuestTracker.QuestStep.ReachChapterEnd:
+                stepText = "\u524d\u5f80\u5730\u56fe\u7ec8\u70b9";
+                break;
+            default:
+                return $"{title}\n[\u5b8c\u6210] \u5730\u56fe\u4efb\u52a1\u5b8c\u6210";
+        }
+
+        return $"{title}\n[\u5f53\u524d] {stepText}";
+    }
+
+    private string BuildCollectFragmentsText(ARBookQuestTracker tracker)
+    {
+        ARBookChapterObjectiveManager objective = tracker.objectiveManager;
+        if (objective == null)
+        {
+            return "\u6536\u96c6\u4efb\u52a1\u7269\u54c1";
+        }
+
+        int count = Mathf.Min(
+            objective.CollectedCount,
+            objective.requiredCollectibleCount);
+        return $"\u6536\u96c6\u4efb\u52a1\u7269\u54c1 ({count} / {objective.requiredCollectibleCount})";
+    }
+
+    private static string GetTrackerCreatureName(ARBookQuestTracker tracker)
+    {
+        if (tracker.creature != null)
+        {
+            return tracker.creature.GetDisplayName();
+        }
+
+        return string.IsNullOrWhiteSpace(tracker.requiredCaptureId)
+            ? "\u7cbe\u7075"
+            : tracker.requiredCaptureId;
+    }
+
+#if false
+    private string GetCurrentQuestTextDisabledForEncodingFallback()
+    {
+        ARBookQuestTracker tracker = FindActiveQuestTracker();
+        if (tracker != null)
+        {
+            tracker.RefreshUI();
+            return BuildQuestTrackerText(tracker);
+        }
+
+        ARBookChapterObjectiveManager objective = FindActiveObjectiveManager();
+        if (objective != null)
+        {
+            objective.RefreshUI();
+            int count = Mathf.Min(
+                objective.CollectedCount,
+                objective.requiredCollectibleCount);
+            string state = objective.IsObjectiveCompleted
+                ? "已完成"
+                : $"{count} / {objective.requiredCollectibleCount}";
+            return $"地图 {objective.chapterId}\n[当前] 任务进度：{state}";
+        }
+
+        ARBookChallenge challenge = FindActiveChallenge();
+        if (challenge != null)
+        {
+            return challenge.IsCompleted
+                ? $"地图 {challenge.chapterId}\n[完成] 机关已完成，寻找并收服这张地图的精灵"
+                : $"地图 {challenge.chapterId}\n[当前] 完成地图机关，并寻找可以收服的精灵";
+        }
+
+        int activeMap = DetectActiveChapter();
+        if (activeMap > 0)
+        {
+            return $"地图 {activeMap}\n[当前] 探索地图，寻找可以对话和收服的精灵";
+        }
+
+        return "等待识别地图书页\n[当前] 翻开任意地图图片开始冒险";
+    }
+
+#if false
+    private string GetCurrentQuestTextDisabled()
+    {
+        ARBookQuestTracker tracker = FindActiveQuestTracker();
+        if (tracker != null)
+        {
+            tracker.RefreshUI();
             if (tracker.questTMPText != null &&
                 !string.IsNullOrWhiteSpace(tracker.questTMPText.text))
             {
@@ -1037,7 +1773,79 @@ public class ARBookGameShellController : MonoBehaviour
         return "等待识别地图书页\n[当前] 翻开任意地图图片开始冒险";
     }
 
+#endif
+
     private string BuildProgressText()
+    {
+        int currentChapter = DetectActiveChapter();
+        int completed = GetCompletedChapterCount();
+        string current = currentChapter > 0
+            ? $"当前地图：{currentChapter} / 5"
+            : "当前地图：未识别";
+        return $"{current}\n已探索地图：{completed} / 5\n识别书页后，任务栏会自动更新。";
+    }
+
+    private string BuildQuestTrackerText(ARBookQuestTracker tracker)
+    {
+        string title = tracker.chapterId == 1
+            ? "第一章：森林初遇"
+            : $"地图 {tracker.chapterId}";
+
+        string stepText;
+        switch (tracker.CurrentStep)
+        {
+            case ARBookQuestTracker.QuestStep.TalkToMentor:
+                stepText = "与导师交谈";
+                break;
+            case ARBookQuestTracker.QuestStep.CollectFragments:
+                stepText = BuildCollectFragmentsText(tracker);
+                break;
+            case ARBookQuestTracker.QuestStep.TalkToCreature:
+                stepText = $"与 {GetTrackerCreatureName(tracker)} 交谈";
+                break;
+            case ARBookQuestTracker.QuestStep.CaptureCreature:
+                stepText = $"收服 {GetTrackerCreatureName(tracker)}";
+                break;
+            case ARBookQuestTracker.QuestStep.ReachChapterEnd:
+                stepText = "前往地图终点";
+                break;
+            default:
+                return $"{title}\n[完成] 地图任务完成";
+        }
+
+        return $"{title}\n[当前] {stepText}";
+    }
+
+    private string BuildCollectFragmentsText(ARBookQuestTracker tracker)
+    {
+        ARBookChapterObjectiveManager objective = tracker.objectiveManager;
+        if (objective == null)
+        {
+            return "收集任务物品";
+        }
+
+        int count = Mathf.Min(
+            objective.CollectedCount,
+            objective.requiredCollectibleCount);
+        return $"收集任务物品 ({count} / {objective.requiredCollectibleCount})";
+    }
+
+    private static string GetTrackerCreatureName(ARBookQuestTracker tracker)
+    {
+        if (tracker.creature != null)
+        {
+            return tracker.creature.GetDisplayName();
+        }
+
+        return string.IsNullOrWhiteSpace(tracker.requiredCaptureId)
+            ? "精灵"
+            : tracker.requiredCaptureId;
+    }
+
+#endif
+
+#if false
+    private string BuildProgressTextDisabled()
     {
         int currentChapter = DetectActiveChapter();
         int completed = GetCompletedChapterCount();
@@ -1046,6 +1854,8 @@ public class ARBookGameShellController : MonoBehaviour
             : "当前地图：未识别";
         return $"{current}\n已探索地图：{completed} / 5\n相机翻书后，常驻任务栏会自动更新。";
     }
+
+#endif
 
     private int DetectActiveChapter()
     {
@@ -1318,6 +2128,24 @@ public class ARBookGameShellController : MonoBehaviour
     {
         if (capturedIds == null || capturedIds.Count == 0)
         {
+            return "No captured creatures.";
+        }
+
+        string text = "Captured:\n";
+        for (int i = 0; i < capturedIds.Count; i++)
+        {
+            CompanionDefinition definition = FindCompanion(capturedIds[i]);
+            text += $"- {(definition != null ? definition.displayName : capturedIds[i])}\n";
+        }
+
+        return text;
+    }
+
+#if false
+    private string BuildCapturedNameListDisabled(List<string> capturedIds)
+    {
+        if (capturedIds == null || capturedIds.Count == 0)
+        {
             return "暂无已收服精灵。";
         }
 
@@ -1330,6 +2158,8 @@ public class ARBookGameShellController : MonoBehaviour
 
         return text;
     }
+
+#endif
 
     private bool IsCaptured(string captureId)
     {
@@ -1399,6 +2229,17 @@ public class ARBookGameShellController : MonoBehaviour
         SetTextObjectActive(chapterHudController.challengeText, false);
     }
 
+    private void HideTransientUi()
+    {
+        SetRootActive(dialogueRoot, false);
+        SetRootActive(battleRoot, false);
+    }
+
+    public void HideActionButtons()
+    {
+        SetRootActive(actionButtonsRoot, false);
+    }
+
     private static void SetTextObjectActive(TMP_Text text, bool active)
     {
         if (text != null)
@@ -1407,66 +2248,45 @@ public class ARBookGameShellController : MonoBehaviour
         }
     }
 
-    private void ApplyExistingUiTheme()
-    {
-        if (!themeExistingUiOnStart)
-        {
-            return;
-        }
-
-        TMP_Text[] texts = FindObjectsOfType<TMP_Text>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] == null || IsChildOfRootCanvas(texts[i].transform))
-            {
-                continue;
-            }
-
-            if (chineseFont != null)
-            {
-                texts[i].font = chineseFont;
-            }
-
-            texts[i].color = TextColor;
-        }
-
-        Button[] buttons = FindObjectsOfType<Button>(true);
-        for (int i = 0; i < buttons.Length; i++)
-        {
-            if (buttons[i] == null || IsChildOfRootCanvas(buttons[i].transform))
-            {
-                continue;
-            }
-
-            StyleButton(buttons[i]);
-        }
-    }
-
     private bool IsChildOfRootCanvas(Transform target)
     {
         return generatedRoot != null && target.IsChildOf(generatedRoot);
     }
 
-    private static RectTransform FindRect(Transform root, string name)
+    private static RectTransform FindRect(Transform root, params string[] names)
     {
-        return FindComponentInNamedChild<RectTransform>(root, name);
+        return FindComponentInNamedChild<RectTransform>(root, names);
     }
 
-    private static Button FindButton(Transform root, string name)
+    private static Button FindButton(Transform root, params string[] names)
     {
-        return FindComponentInNamedChild<Button>(root, name);
+        return FindComponentInNamedChild<Button>(root, names);
     }
 
-    private static TMP_Text FindText(Transform root, string name)
+    private static TMP_Text FindText(Transform root, params string[] names)
     {
-        return FindComponentInNamedChild<TMP_Text>(root, name);
+        return FindComponentInNamedChild<TMP_Text>(root, names);
     }
 
-    private static T FindComponentInNamedChild<T>(Transform root, string name)
+    private static T FindComponentInNamedChild<T>(Transform root, params string[] names)
         where T : Component
     {
-        Transform child = FindDescendant(root, name);
-        return child != null ? child.GetComponent<T>() : null;
+        if (root == null || names == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < names.Length; i++)
+        {
+            Transform child = FindDescendant(root, names[i]);
+            T component = child != null ? child.GetComponent<T>() : null;
+            if (component != null)
+            {
+                return component;
+            }
+        }
+
+        return null;
     }
 
     private static Transform FindDescendant(Transform root, string name)
@@ -1511,8 +2331,7 @@ public class ARBookGameShellController : MonoBehaviour
         SetAnchors(rect, anchorMin, anchorMax);
         rect.sizeDelta = size;
         UIImage image = rect.gameObject.AddComponent<UIImage>();
-        image.color = Navy;
-        AddOutline(rect.gameObject, Gold, new Vector2(2.5f, -2.5f));
+        image.raycastTarget = false;
         return rect;
     }
 
@@ -1530,7 +2349,6 @@ public class ARBookGameShellController : MonoBehaviour
         text.fontSize = fontSize;
         text.fontStyle = style;
         text.alignment = alignment;
-        text.color = TextColor;
         text.raycastTarget = false;
         text.enableWordWrapping = true;
         if (chineseFont != null)
@@ -1546,8 +2364,24 @@ public class ARBookGameShellController : MonoBehaviour
         RectTransform rect = CreateRect(name, parent);
         UIImage image = rect.gameObject.AddComponent<UIImage>();
         image.sprite = sprite;
-        image.color = sprite != null ? Color.white : NavyLight;
         image.preserveAspect = true;
+        return image;
+    }
+
+    private static UIImage AddEditableBackground(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return null;
+        }
+
+        UIImage image = rect.GetComponent<UIImage>();
+        if (image == null)
+        {
+            image = rect.gameObject.AddComponent<UIImage>();
+        }
+
+        image.raycastTarget = false;
         return image;
     }
 
@@ -1561,8 +2395,8 @@ public class ARBookGameShellController : MonoBehaviour
         {
             UIImage image = rect.gameObject.AddComponent<UIImage>();
             image.sprite = definition.portrait;
-            image.color = Color.white;
             image.preserveAspect = true;
+            image.raycastTarget = false;
             return rect;
         }
 
@@ -1570,13 +2404,60 @@ public class ARBookGameShellController : MonoBehaviour
         {
             RawImage rawImage = rect.gameObject.AddComponent<RawImage>();
             rawImage.texture = definition.portraitTexture;
-            rawImage.color = Color.white;
+            rawImage.raycastTarget = false;
             return rect;
         }
 
         UIImage fallback = rect.gameObject.AddComponent<UIImage>();
-        fallback.color = new Color(0.14f, 0.26f, 0.34f, 1f);
+        fallback.raycastTarget = false;
         return rect;
+    }
+
+    private static void DisableChildRaycasts(RectTransform root, Graphic except)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = root.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            if (graphics[i] != null && graphics[i] != except)
+            {
+                graphics[i].raycastTarget = false;
+            }
+        }
+    }
+
+    private Slider CreateEditableSlider(string name, Transform parent)
+    {
+        RectTransform root = CreatePanel(
+            name,
+            parent,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(320f, 28f));
+        UIImage background = root.GetComponent<UIImage>();
+        background.raycastTarget = false;
+
+        RectTransform fillArea = CreateRect("Fill Area", root);
+        Stretch(fillArea, 6f, 4f, 6f, 4f);
+
+        RectTransform fill = CreateRect("Fill", fillArea);
+        Stretch(fill, 0f, 0f, 0f, 0f);
+        UIImage fillImage = fill.gameObject.AddComponent<UIImage>();
+        fillImage.raycastTarget = false;
+
+        Slider slider = root.gameObject.AddComponent<Slider>();
+        slider.transition = Selectable.Transition.None;
+        slider.interactable = false;
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.value = 1f;
+        slider.fillRect = fill;
+        slider.targetGraphic = background;
+        return slider;
     }
 
     private Button CreateButton(string name, Transform parent, string label, int fontSize)
@@ -1588,11 +2469,11 @@ public class ARBookGameShellController : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             new Vector2(260f, 68f));
         UIImage image = rect.GetComponent<UIImage>();
-        image.color = Gold;
+        image.raycastTarget = true;
 
         Button button = rect.gameObject.AddComponent<Button>();
         button.targetGraphic = image;
-        StyleButton(button);
+        button.transition = Selectable.Transition.None;
 
         TMP_Text text = CreateText(
             "Label",
@@ -1601,36 +2482,59 @@ public class ARBookGameShellController : MonoBehaviour
             fontSize,
             FontStyles.Bold,
             TextAlignmentOptions.Center);
-        text.color = new Color(0.12f, 0.08f, 0.02f, 1f);
         Stretch(text.rectTransform, 12f, 4f, 12f, 4f);
+        ApplyDefaultButtonPlacement(name, parent, button);
         return button;
     }
 
-    private void StyleButton(Button button)
+    private static void ApplyDefaultButtonPlacement(
+        string name,
+        Transform parent,
+        Button button)
     {
-        if (button == null)
+        if (button == null || parent == null)
         {
             return;
         }
 
-        UIImage image = button.GetComponent<UIImage>();
-        if (image != null)
+        if (parent.name == "HUDButtons")
         {
-            image.color = Gold;
-            if (image.GetComponent<Outline>() == null)
+            if (name == "BackpackButton")
             {
-                AddOutline(image.gameObject, GoldDark, new Vector2(2f, -2f));
+                SetButtonRect(button, new Vector2(-210f, 0f), new Vector2(190f, 68f));
+            }
+            else if (name == "CompanionButton")
+            {
+                SetButtonRect(button, new Vector2(0f, 0f), new Vector2(190f, 68f));
+            }
+            else if (name == "HomeButton")
+            {
+                SetButtonRect(button, new Vector2(210f, 0f), new Vector2(190f, 68f));
             }
         }
-
-        ColorBlock colors = button.colors;
-        colors.normalColor = Gold;
-        colors.highlightedColor = new Color(1f, 0.82f, 0.36f, 1f);
-        colors.pressedColor = new Color(0.72f, 0.48f, 0.12f, 1f);
-        colors.selectedColor = colors.highlightedColor;
-        colors.disabledColor = new Color(0.35f, 0.32f, 0.28f, 0.7f);
-        colors.colorMultiplier = 1f;
-        button.colors = colors;
+        else if (parent.name == "Actions")
+        {
+            if (name == "PlaceButton")
+            {
+                SetButtonRect(button, new Vector2(-390f, 0f), new Vector2(250f, 68f));
+            }
+            else if (name == "AffectionButton")
+            {
+                SetButtonRect(button, new Vector2(-130f, 0f), new Vector2(250f, 68f));
+            }
+            else if (name == "ClearButton")
+            {
+                SetButtonRect(button, new Vector2(130f, 0f), new Vector2(250f, 68f));
+            }
+            else if (name == "CloseButton")
+            {
+                SetButtonRect(button, new Vector2(390f, 0f), new Vector2(250f, 68f));
+            }
+        }
+        else if (parent.name == "BackpackPanel" && name == "CloseButton")
+        {
+            SetButtonRect(button, new Vector2(0f, -190f), new Vector2(420f, 70f));
+        }
     }
 
     private static RectTransform CreateRect(string name, Transform parent)
@@ -1639,6 +2543,27 @@ public class ARBookGameShellController : MonoBehaviour
         RectTransform rect = gameObject.GetComponent<RectTransform>();
         rect.SetParent(parent, false);
         return rect;
+    }
+
+    private static void SetButtonRect(
+        Button button,
+        Vector2 anchoredPosition,
+        Vector2 size)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        RectTransform rect = button.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        SetAnchors(rect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        rect.sizeDelta = size;
+        rect.anchoredPosition = anchoredPosition;
     }
 
     private static void SetAnchors(RectTransform rect, Vector2 min, Vector2 max)
@@ -1661,46 +2586,6 @@ public class ARBookGameShellController : MonoBehaviour
         rect.anchorMax = Vector2.one;
         rect.offsetMin = new Vector2(left, bottom);
         rect.offsetMax = new Vector2(-right, -top);
-    }
-
-    private static void SetLayout(RectTransform rect, float preferredHeight)
-    {
-        LayoutElement element = rect.gameObject.GetComponent<LayoutElement>();
-        if (element == null)
-        {
-            element = rect.gameObject.AddComponent<LayoutElement>();
-        }
-
-        element.preferredHeight = preferredHeight;
-        element.minHeight = preferredHeight;
-    }
-
-    private static void AddVerticalLayout(
-        RectTransform rect,
-        float spacing,
-        int left,
-        int right,
-        int top,
-        int bottom)
-    {
-        VerticalLayoutGroup layout = rect.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = spacing;
-        layout.padding = new RectOffset(left, right, top, bottom);
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.childAlignment = TextAnchor.UpperCenter;
-    }
-
-    private static void AddOutline(GameObject target, Color color, Vector2 distance)
-    {
-        Outline outline = target.GetComponent<Outline>();
-        if (outline == null)
-        {
-            outline = target.AddComponent<Outline>();
-        }
-
-        outline.effectColor = color;
-        outline.effectDistance = distance;
     }
 
     private static void SetRootActive(RectTransform root, bool active)

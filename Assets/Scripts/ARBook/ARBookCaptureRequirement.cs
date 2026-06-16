@@ -4,6 +4,7 @@ public class ARBookCaptureRequirement : MonoBehaviour
 {
     public ARBookChapterObjectiveManager objectiveManager;
     public ARBookChallenge requiredChallenge;
+    public bool autoResolveRequiredChallenge;
     [Min(1)] public int requiredCollectibleCount = 3;
     public string lockedSpeaker = "Pikachu";
     [TextArea(2, 4)] public string lockedDialogue = "需要先找齐三个闪电碎片。";
@@ -57,6 +58,11 @@ public class ARBookCaptureRequirement : MonoBehaviour
     private void ResolveChallenge()
     {
         if (requiredChallenge != null)
+        {
+            return;
+        }
+
+        if (!autoResolveRequiredChallenge)
         {
             return;
         }

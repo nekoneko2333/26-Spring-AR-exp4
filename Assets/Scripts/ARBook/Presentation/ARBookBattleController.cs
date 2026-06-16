@@ -11,6 +11,7 @@ public class ARBookBattleController : MonoBehaviour
     public ARBookBattleCombatant player;
     public ARBookBattleCombatant enemy;
     public GameObject introHiddenOpponent;
+    public GameObject battleUiRoot;
     public GameObject battleControlsRoot;
     public TMP_Text messageText;
 
@@ -64,11 +65,7 @@ public class ARBookBattleController : MonoBehaviour
         StopAllCoroutines();
         IsRunning = false;
         IsBusy = false;
-
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(false);
-        }
+        HideBattleUi();
 
         session?.Exit();
         BattleFinished?.Invoke(false);
@@ -78,17 +75,15 @@ public class ARBookBattleController : MonoBehaviour
     private IEnumerator BeginBattleRoutine()
     {
         IsBusy = true;
-        SetMessage("战斗开始");
-
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(false);
-        }
+        HideBattleUi();
+        SetMessage("\u6218\u6597\u5f00\u59cb");
 
         if (session != null)
         {
             yield return session.Enter();
         }
+
+        ShowBattleUi(false);
 
         player?.ResetCombatant();
         enemy?.ResetCombatant();
@@ -115,13 +110,8 @@ public class ARBookBattleController : MonoBehaviour
         }
 
         enemy?.PlayEntry();
-
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(true);
-        }
-
-        SetMessage("选择行动");
+        ShowBattleUi(true);
+        SetMessage("\u9009\u62e9\u884c\u52a8");
         IsRunning = true;
         IsBusy = false;
         battleRoutine = null;
@@ -141,7 +131,7 @@ public class ARBookBattleController : MonoBehaviour
             battleControlsRoot.SetActive(false);
         }
 
-        SetMessage($"{player.displayName} 发动攻击");
+        SetMessage($"{player.displayName} \u53d1\u52a8\u653b\u51fb");
         player.PlayAttack();
         yield return new WaitForSecondsRealtime(attackImpactDelay);
         enemy.TakeDamage(player.attackPower);
@@ -153,7 +143,7 @@ public class ARBookBattleController : MonoBehaviour
         }
 
         yield return new WaitForSecondsRealtime(counterAttackDelay);
-        SetMessage($"{enemy.displayName} 发动反击");
+        SetMessage($"{enemy.displayName} \u53d1\u52a8\u53cd\u51fb");
         enemy.PlayAttack();
         yield return new WaitForSecondsRealtime(attackImpactDelay);
         player.TakeDamage(enemy.attackPower);
@@ -164,7 +154,7 @@ public class ARBookBattleController : MonoBehaviour
             yield break;
         }
 
-        SetMessage("选择行动");
+        SetMessage("\u9009\u62e9\u884c\u52a8");
         if (battleControlsRoot != null)
         {
             battleControlsRoot.SetActive(true);
@@ -180,13 +170,13 @@ public class ARBookBattleController : MonoBehaviour
         if (playerWon)
         {
             player.PlayCaptureSuccess();
-            SetMessage("战斗胜利");
+            SetMessage("\u6218\u6597\u80dc\u5229");
             onPlayerVictory?.Invoke();
         }
         else
         {
             enemy.PlayVictory();
-            SetMessage("战斗失败");
+            SetMessage("\u6218\u6597\u5931\u8d25");
             onPlayerDefeat?.Invoke();
         }
 
@@ -204,15 +194,37 @@ public class ARBookBattleController : MonoBehaviour
 
         IsRunning = false;
         IsBusy = false;
+        HideBattleUi();
 
+        session?.Exit();
+        BattleFinished?.Invoke(playerWon);
+        onBattleExited?.Invoke();
+    }
+
+    private void ShowBattleUi(bool showControls)
+    {
+        if (battleUiRoot != null)
+        {
+            battleUiRoot.SetActive(true);
+        }
+
+        if (battleControlsRoot != null)
+        {
+            battleControlsRoot.SetActive(showControls);
+        }
+    }
+
+    private void HideBattleUi()
+    {
         if (battleControlsRoot != null)
         {
             battleControlsRoot.SetActive(false);
         }
 
-        session?.Exit();
-        BattleFinished?.Invoke(playerWon);
-        onBattleExited?.Invoke();
+        if (battleUiRoot != null)
+        {
+            battleUiRoot.SetActive(false);
+        }
     }
 
     private void SetMessage(string value)
