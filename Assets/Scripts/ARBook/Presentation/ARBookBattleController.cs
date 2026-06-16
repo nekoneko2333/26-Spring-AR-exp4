@@ -15,6 +15,8 @@ public class ARBookBattleController : MonoBehaviour
     public GameObject battleUiRoot;
     public GameObject battleControlsRoot;
     public TMP_Text messageText;
+    public Button battleAttackButton;
+    public Button battleExitButton;
     public Button companionAButton;
     public Button companionBButton;
     public TMP_Text companionAButtonText;
@@ -47,6 +49,7 @@ public class ARBookBattleController : MonoBehaviour
             return;
         }
 
+        ResolveControlsRoot();
         ResolveAssistButtons();
         RefreshAssistButtons();
         battleRoutine = StartCoroutine(BeginBattleRoutine());
@@ -138,7 +141,7 @@ public class ARBookBattleController : MonoBehaviour
         SetMessage("\u9009\u62e9\u884c\u52a8");
         IsRunning = true;
         IsBusy = false;
-        RefreshAssistButtons();
+        SetControlsInteractable(true);
         battleRoutine = null;
     }
 
@@ -151,10 +154,7 @@ public class ARBookBattleController : MonoBehaviour
     {
         IsBusy = true;
 
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(false);
-        }
+        SetControlsInteractable(false);
 
         SetMessage($"{player.displayName} \u53d1\u52a8\u653b\u51fb");
         player.PlayAttack();
@@ -180,10 +180,7 @@ public class ARBookBattleController : MonoBehaviour
         }
 
         SetMessage("\u9009\u62e9\u884c\u52a8");
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(true);
-        }
+        SetControlsInteractable(true);
 
         IsBusy = false;
     }
@@ -216,10 +213,7 @@ public class ARBookBattleController : MonoBehaviour
         }
 
         IsBusy = true;
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(false);
-        }
+        SetControlsInteractable(false);
 
         SetMessage(actionMessage);
         yield return new WaitForSecondsRealtime(attackImpactDelay);
@@ -243,10 +237,7 @@ public class ARBookBattleController : MonoBehaviour
         }
 
         SetMessage("选择行动");
-        if (battleControlsRoot != null)
-        {
-            battleControlsRoot.SetActive(true);
-        }
+        SetControlsInteractable(true);
 
         RefreshAssistButtons();
         IsBusy = false;
@@ -320,6 +311,43 @@ public class ARBookBattleController : MonoBehaviour
         }
     }
 
+    private void SetControlsActive(bool active)
+    {
+        ResolveControlsRoot();
+        if (battleControlsRoot != null)
+        {
+            battleControlsRoot.SetActive(active);
+        }
+    }
+
+    private void SetControlsInteractable(bool interactable)
+    {
+        ResolveAssistButtons();
+        if (battleAttackButton != null)
+        {
+            battleAttackButton.interactable = interactable;
+        }
+
+        if (battleExitButton != null)
+        {
+            battleExitButton.interactable = interactable;
+        }
+
+        RefreshAssistButtons();
+        if (!interactable)
+        {
+            if (companionAButton != null)
+            {
+                companionAButton.interactable = false;
+            }
+
+            if (companionBButton != null)
+            {
+                companionBButton.interactable = false;
+            }
+        }
+    }
+
     private void SetMessage(string value)
     {
         if (messageText != null)
@@ -330,22 +358,49 @@ public class ARBookBattleController : MonoBehaviour
 
     private void ResolveAssistButtons()
     {
+        ResolveControlsRoot();
         if (battleControlsRoot == null)
         {
             return;
         }
 
-        companionAButton = companionAButton ??
-            FindButton(battleControlsRoot.transform, "CompanionAButton");
-        companionBButton = companionBButton ??
-            FindButton(battleControlsRoot.transform, "CompanionBButton");
-        companionAButtonText = companionAButtonText ??
-            companionAButton?.GetComponentInChildren<TMP_Text>(true);
-        companionBButtonText = companionBButtonText ??
-            companionBButton?.GetComponentInChildren<TMP_Text>(true);
+        battleAttackButton = ResolveNamedOrExistingButton(
+            battleControlsRoot.transform,
+            "AttackButton",
+            battleAttackButton);
+        battleExitButton = ResolveNamedOrExistingButton(
+            battleControlsRoot.transform,
+            "ExitButton",
+            battleExitButton);
+        companionAButton = FindButton(battleControlsRoot.transform, "CompanionAButton");
+        companionBButton = FindButton(battleControlsRoot.transform, "CompanionBButton");
+        companionAButtonText =
+            companionAButton != null
+                ? companionAButton.GetComponentInChildren<TMP_Text>(true)
+                : null;
+        companionBButtonText =
+            companionBButton != null
+                ? companionBButton.GetComponentInChildren<TMP_Text>(true)
+                : null;
 
         WireAssistButton(companionAButton, CompanionAAttack);
         WireAssistButton(companionBButton, CompanionBAttack);
+    }
+
+    private void ResolveControlsRoot()
+    {
+        if (battleControlsRoot == null)
+        {
+            return;
+        }
+
+        Transform controls = FindChildRecursive(
+            battleControlsRoot.transform,
+            "BattleControls");
+        if (controls != null && controls.gameObject != battleControlsRoot)
+        {
+            battleControlsRoot = controls.gameObject;
+        }
     }
 
     private void RefreshAssistButtons()
@@ -376,6 +431,12 @@ public class ARBookBattleController : MonoBehaviour
 
         if (button != null)
         {
+            if (button.name != "CompanionAButton" &&
+                button.name != "CompanionBButton")
+            {
+                return;
+            }
+
             button.interactable = ARBookCompanionBattleRoster.CanBattle(captureId);
         }
     }
@@ -393,6 +454,51 @@ public class ARBookBattleController : MonoBehaviour
             if (buttons[i] != null && buttons[i].name == name)
             {
                 return buttons[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static Button ResolveNamedOrExistingButton(
+        Transform root,
+        string name,
+        Button existing)
+    {
+        Button named = FindButton(root, name);
+        if (named != null)
+        {
+            return named;
+        }
+
+        if (existing != null &&
+            existing.name != "CompanionAButton" &&
+            existing.name != "CompanionBButton")
+        {
+            return existing;
+        }
+
+        return null;
+    }
+
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        if (root.name == name)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindChildRecursive(root.GetChild(i), name);
+            if (found != null)
+            {
+                return found;
             }
         }
 

@@ -204,6 +204,34 @@ public static class ARBookCompanionBattleRoster
         PlayerPrefs.DeleteKey(PartyBKey);
     }
 
+    public static void ClearMood(string captureId)
+    {
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return;
+        }
+
+        PlayerPrefs.DeleteKey(GetMoodKey(captureId));
+        PlayerPrefs.DeleteKey(GetLastMoodUtcKey(captureId));
+    }
+
+    public static void ClearAll(string[] captureIds)
+    {
+        Clear();
+        if (captureIds == null)
+        {
+            PlayerPrefs.Save();
+            return;
+        }
+
+        for (int i = 0; i < captureIds.Length; i++)
+        {
+            ClearMood(captureIds[i]);
+        }
+
+        PlayerPrefs.Save();
+    }
+
     private static void ApplyPassiveMoodRecovery(string captureId)
     {
         string key = GetLastMoodUtcKey(captureId);
@@ -228,7 +256,9 @@ public static class ARBookCompanionBattleRoster
         }
 
         int current = PlayerPrefs.GetInt(GetMoodKey(captureId), MaxMood);
-        PlayerPrefs.SetInt(GetMoodKey(captureId), Mathf.Clamp(current + recovered, 0, MaxMood));
+        PlayerPrefs.SetInt(
+            GetMoodKey(captureId),
+            Mathf.Clamp(current + recovered, 0, MaxMood));
         StampMoodTime(captureId);
     }
 

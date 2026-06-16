@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 public class ARBookPlayerPower : MonoBehaviour
@@ -30,9 +30,19 @@ public class ARBookPlayerPower : MonoBehaviour
 
     public static ARBookPlayerPower Resolve()
     {
-        return Instance != null
-            ? Instance
-            : FindObjectOfType<ARBookPlayerPower>(true);
+        if (Instance != null)
+        {
+            return Instance;
+        }
+
+        ARBookPlayerPower existing = FindObjectOfType<ARBookPlayerPower>(true);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject powerObject = new GameObject("ARBookPlayerPower");
+        return powerObject.AddComponent<ARBookPlayerPower>();
     }
 
     public void GrantAttackPower(int amount)

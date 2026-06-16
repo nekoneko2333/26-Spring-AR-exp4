@@ -7,11 +7,26 @@ public class ARBookDebugProgressResetter : MonoBehaviour
     public int maxChapterId = 5;
     public string[] captureIds =
     {
+        "Bulbasaur",
+        "Talonflame",
+        "Axew",
         "Pikachu",
-        "Celebi",
+        "Meowth",
         "Infernape",
+        "Squirtle",
+        "Jirachi",
+        "Sneasler",
+        "Zorua",
+        "Zekrom",
+        "Zygarde10",
+        "Toxtricity",
+        "Scizor",
+        "Mismagius",
+        "Mew",
         "Manaphy",
-        "Zekrom"
+        "ElectrodeHisuian",
+        "Dragapult",
+        "Celebi"
     };
     public string[] collectibleIds =
     {
@@ -64,6 +79,8 @@ public class ARBookDebugProgressResetter : MonoBehaviour
         DeleteKey("CapturedIds");
         DeleteKey("FinaleCompleted");
         DeleteKey(ARBookPlayerPower.AttackBonusKey);
+        ARBookCompanionBattleRoster.ClearAll(captureIds);
+        DeleteKey("CompanionInteractionCount_CurrentGame");
         PlayerPrefs.Save();
 
         if (logClearedKeys)

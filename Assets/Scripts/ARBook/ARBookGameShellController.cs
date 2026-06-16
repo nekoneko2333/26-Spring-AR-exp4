@@ -1,9 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UIImage = UnityEngine.UI.Image;
 using VuforiaObserverBehaviour = Vuforia.ObserverBehaviour;
 using VuforiaStatus = Vuforia.Status;
@@ -13,12 +16,19 @@ public class ARBookGameShellController : MonoBehaviour
     [Serializable]
     public class CompanionDefinition
     {
+        [Tooltip("收服存档 ID，需要和 ARBookInteractable.captureId 一致。")]
         public string captureId;
+        [Tooltip("陪伴/背包 UI 显示名。")]
         public string displayName;
+        [Tooltip("陪伴模式扫描的 SinglePokemon ImageTarget 名字。为空时默认使用 captureId。")]
         public string imageTargetName;
+        [Tooltip("可选。手动绑定 UI 卡片图片 Sprite。优先级低于 Portrait Texture。")]
         public Sprite portrait;
+        [Tooltip("推荐手动绑定这里：把 Vuforia/ImageTargetTextures/mcfAR 下对应 jpg 直接拖进来。")]
         public Texture2D portraitTexture;
+        [Tooltip("可选。没有 SinglePokemon 场景模型时使用的陪伴模型预制体。")]
         public GameObject companionPrefab;
+        [Tooltip("可选。没有 SinglePokemon 场景模型时使用的场景模型对象。")]
         public GameObject sceneObject;
     }
 
@@ -32,12 +42,6 @@ public class ARBookGameShellController : MonoBehaviour
     [Header("UI Assets")]
     public TMP_FontAsset chineseFont;
     public Sprite playerAvatarSprite;
-/*
-    public string playerName = "训练家";
-*/
-/*
-    public string playerName = "训练家";
-*/
     public string playerName = "\u8bad\u7ec3\u5bb6";
     [Range(1, 999)] public int maxHP = 100;
     [Range(0, 999)] public int currentHP = 100;
@@ -53,6 +57,7 @@ public class ARBookGameShellController : MonoBehaviour
     public Vector3 companionImageTargetLocalOffset = Vector3.zero;
     public bool hideCompanionUntilImageTracked = true;
     [Range(1, 25)] public int companionInteractionAffectionGain = 5;
+    [Range(1, 20)] public int maxCompanionInteractionsPerGame = 5;
     public string singlePokemonRootName = "SinglePokemon";
 
     [Header("Scene UI References")]
@@ -75,7 +80,9 @@ public class ARBookGameShellController : MonoBehaviour
     public TMP_Text battleMessageText;
     public TMP_Text battleLeftHPText;
     public TMP_Text battleRightHPText;
+    public TMP_Text companionCameraStatusText;
     public UIImage hpFill;
+    public UIImage companionMoodFill;
     public UIImage dialogueLeftHighlight;
     public UIImage dialogueRightHighlight;
     public Button startButton;
@@ -92,12 +99,16 @@ public class ARBookGameShellController : MonoBehaviour
     public Button dialogueContinueButton;
     public Button battleAttackButton;
     public Button battleExitButton;
+    public Button companionCameraInteractButton;
+    public Button companionReturnGameButton;
+    public Button companionReturnHomeButton;
     public Slider battleLeftHPSlider;
     public Slider battleRightHPSlider;
 
     private const string StartedKey = "ARBookHasStarted";
     private const string CapturedIdsKey = "CapturedIds";
     private const string AffectionPrefix = "CompanionAffection_";
+    private const string CompanionInteractionCountKey = "CompanionInteractionCount_CurrentGame";
 
     private GameObject runtimeEventSystem;
 
@@ -107,8 +118,12 @@ public class ARBookGameShellController : MonoBehaviour
     private string activeCompanionId;
     private VuforiaObserverBehaviour activeCompanionTarget;
     private GameObject activeSceneCompanionModel;
+    private bool companionCameraModeActive;
+    private bool singlePokemonCameraModeActive;
+    private string selectedBackpackPartyId;
     private float nextCompanionTargetLookupTime;
     private float nextRefreshTime;
+    private TMP_Text affectionButtonText;
 
     public bool IsHudVisible =>
         hudRoot != null &&
@@ -215,50 +230,50 @@ public class ARBookGameShellController : MonoBehaviour
 /*
         companions = new[]
         {
-            CreateCompanion("Bulbasaur", "妙蛙种子"),
-            CreateCompanion("Talonflame", "烈箭鹰"),
-            CreateCompanion("Axew", "牙牙"),
-            CreateCompanion("Pikachu", "皮卡丘"),
-            CreateCompanion("Meowth", "喵喵"),
-            CreateCompanion("Infernape", "烈焰猴"),
-            CreateCompanion("Squirtle", "杰尼龟"),
-            CreateCompanion("Jirachi", "基拉祈"),
-            CreateCompanion("Sneasler", "狃拉"),
-            CreateCompanion("Zorua", "索罗亚"),
-            CreateCompanion("Zekrom", "捷克罗姆"),
-            CreateCompanion("Zygarde10", "基格尔德10%形态"),
-            CreateCompanion("Toxtricity", "颤弦蝾螈"),
-            CreateCompanion("Scizor", "巨钳螳螂"),
-            CreateCompanion("Mismagius", "梦妖魔"),
-            CreateCompanion("Mew", "梦幻"),
-            CreateCompanion("Manaphy", "玛纳霏"),
-            CreateCompanion("ElectrodeHisuian", "霹雳电球（洗翠的样子）"),
-            CreateCompanion("Dragapult", "多龙巴鲁托"),
-            CreateCompanion("Celebi", "时拉比")
+            CreateCompanion("Bulbasaur", "濡欒洐绉嶅瓙"),
+            CreateCompanion("Talonflame", "鐑堢楣?),
+            CreateCompanion("Axew", "鐗欑墮"),
+            CreateCompanion("Pikachu", "鐨崱涓?),
+            CreateCompanion("Meowth", "鍠靛柕"),
+            CreateCompanion("Infernape", "鐑堢劙鐚?),
+            CreateCompanion("Squirtle", "鏉板凹榫?),
+            CreateCompanion("Jirachi", "鍩烘媺绁?),
+            CreateCompanion("Sneasler", "鐙冩媺"),
+            CreateCompanion("Zorua", "绱㈢綏浜?),
+            CreateCompanion("Zekrom", "鎹峰厠缃楀"),
+            CreateCompanion("Zygarde10", "鍩烘牸灏斿痉10%褰㈡€?),
+            CreateCompanion("Toxtricity", "棰ゅ鸡铦捐瀳"),
+            CreateCompanion("Scizor", "宸ㄩ挸铻宠瀭"),
+            CreateCompanion("Mismagius", "姊﹀榄?),
+            CreateCompanion("Mew", "姊﹀够"),
+            CreateCompanion("Manaphy", "鐜涚撼闇?),
+            CreateCompanion("ElectrodeHisuian", "闇归洺鐢电悆锛堟礂缈犵殑鏍峰瓙锛?),
+            CreateCompanion("Dragapult", "澶氶緳宸撮瞾鎵?),
+            CreateCompanion("Celebi", "鏃舵媺姣?)
         };
 */
         companions = new[]
         {
-            CreateCompanion("Bulbasaur", "妙蛙种子"),
-            CreateCompanion("Talonflame", "烈箭鹰"),
-            CreateCompanion("Axew", "牙牙"),
-            CreateCompanion("Pikachu", "皮卡丘"),
-            CreateCompanion("Meowth", "喵喵"),
-            CreateCompanion("Infernape", "烈焰猴"),
-            CreateCompanion("Squirtle", "杰尼龟"),
-            CreateCompanion("Jirachi", "基拉祈"),
-            CreateCompanion("Sneasler", "狃拉"),
-            CreateCompanion("Zorua", "索罗亚"),
-            CreateCompanion("Zekrom", "捷克罗姆"),
-            CreateCompanion("Zygarde10", "基格尔德10%形态"),
-            CreateCompanion("Toxtricity", "颤弦蝾螈"),
-            CreateCompanion("Scizor", "巨钳螳螂"),
-            CreateCompanion("Mismagius", "梦妖魔"),
-            CreateCompanion("Mew", "梦幻"),
-            CreateCompanion("Manaphy", "玛纳霏"),
-            CreateCompanion("ElectrodeHisuian", "霹雳电球（洗翠的样子）"),
-            CreateCompanion("Dragapult", "多龙巴鲁托"),
-            CreateCompanion("Celebi", "时拉比")
+            CreateCompanion("Bulbasaur", "濡欒洐绉嶅瓙"),
+            CreateCompanion("Talonflame", "鐑堢楣?),
+            CreateCompanion("Axew", "鐗欑墮"),
+            CreateCompanion("Pikachu", "鐨崱涓?),
+            CreateCompanion("Meowth", "鍠靛柕"),
+            CreateCompanion("Infernape", "鐑堢劙鐚?),
+            CreateCompanion("Squirtle", "鏉板凹榫?),
+            CreateCompanion("Jirachi", "鍩烘媺绁?),
+            CreateCompanion("Sneasler", "鐙冩媺"),
+            CreateCompanion("Zorua", "绱㈢綏浜?),
+            CreateCompanion("Zekrom", "鎹峰厠缃楀"),
+            CreateCompanion("Zygarde10", "鍩烘牸灏斿痉10%褰㈡€?),
+            CreateCompanion("Toxtricity", "棰ゅ鸡铦捐瀳"),
+            CreateCompanion("Scizor", "宸ㄩ挸铻宠瀭"),
+            CreateCompanion("Mismagius", "姊﹀榄?),
+            CreateCompanion("Mew", "姊﹀够"),
+            CreateCompanion("Manaphy", "鐜涚撼闇?),
+            CreateCompanion("ElectrodeHisuian", "闇归洺鐢电悆锛堟礂缈犵殑鏍峰瓙锛?),
+            CreateCompanion("Dragapult", "澶氶緳宸撮瞾鎵?),
+            CreateCompanion("Celebi", "鏃舵媺姣?)
         };
     }
 
@@ -266,7 +281,7 @@ public class ARBookGameShellController : MonoBehaviour
 
     public void ShowHome()
     {
-        SetSinglePokemonTargetsActive(null);
+        ExitCompanionCameraMode();
         SetRootActive(homeRoot, true);
         SetRootActive(hudRoot, false);
         SetRootActive(companionRoot, false);
@@ -280,10 +295,7 @@ public class ARBookGameShellController : MonoBehaviour
     {
         PlayerPrefs.SetInt(StartedKey, 1);
         PlayerPrefs.Save();
-        if (string.IsNullOrWhiteSpace(activeCompanionId))
-        {
-            SetSinglePokemonTargetsActive(null);
-        }
+        ExitCompanionCameraMode();
 
         SetRootActive(homeRoot, false);
         SetRootActive(hudRoot, true);
@@ -327,10 +339,36 @@ public class ARBookGameShellController : MonoBehaviour
         }
         BuildCompanionGrid();
         RefreshCompanionDetail();
+        ApplyCompanionCameraHud(false);
+    }
+
+    public void OpenCapturedSinglePokemonMode()
+    {
+        PlayerPrefs.SetInt(StartedKey, 1);
+        PlayerPrefs.Save();
+        DespawnAllCompanions();
+        activeCompanionId = null;
+        activeCompanionTarget = null;
+        activeSceneCompanionModel = null;
+        selectedCompanionIds.Clear();
+        ApplyCompanionCameraHud(false);
+        ApplySinglePokemonCameraHud(true);
+        SetRootActive(homeRoot, false);
+        SetRootActive(companionRoot, false);
+        SetRootActive(backpackRoot, false);
+        SetRootActive(hudRoot, true);
+        HideTransientUi();
+        HideActionButtons();
+        EnsureMainCameraRendering();
+        SetNonSinglePokemonTargetsActive(false);
+        SetAllSinglePokemonTargetsActive();
+        RefreshHud();
     }
 
     public void CloseCompanionMode()
     {
+        ApplyCompanionCameraHud(false);
+        SetNonSinglePokemonTargetsActive(true);
         SetRootActive(companionRoot, false);
         if (PlayerPrefs.GetInt(StartedKey, 0) == 1)
         {
@@ -344,10 +382,7 @@ public class ARBookGameShellController : MonoBehaviour
 
     public void OpenBackpack()
     {
-        SetRootActive(backpackRoot, true);
-        SetRootActive(companionRoot, false);
-        HideActionButtons();
-        RefreshBackpack();
+        OpenCompanionMode();
     }
 
     public void CloseBackpack()
@@ -358,6 +393,7 @@ public class ARBookGameShellController : MonoBehaviour
     public void ApplyDefaultUiVisibility()
     {
         BindSceneInterface();
+        ApplyCompanionCameraHud(false);
         SetRootActive(homeRoot, showCoverOnStart);
         SetRootActive(hudRoot, !showCoverOnStart);
         SetRootActive(companionRoot, false);
@@ -393,6 +429,7 @@ public class ARBookGameShellController : MonoBehaviour
         }
 
         SetSinglePokemonTargetsActive(activeCompanionTarget);
+        SetNonSinglePokemonTargetsActive(false);
         GameObject instance = CreateCompanionInstance(definition, 0);
         if (instance != null)
         {
@@ -400,9 +437,20 @@ public class ARBookGameShellController : MonoBehaviour
             ConfigureCompanionInstance(instance, definition);
             RefreshPlacedCompanionTracking(true);
         }
+        else
+        {
+            Debug.LogWarning(
+                $"陪伴模式：{captureId} 找到了识别图 {activeCompanionTarget.TargetName}，但没有找到可显示的模型。",
+                this);
+        }
 
         RefreshCompanionDetail();
         CloseCompanionModeToCamera();
+    }
+
+    public void BeginSelectedCompanionMode()
+    {
+        AddAffectionToSelected();
     }
 
     private void CloseCompanionModeToCamera()
@@ -415,7 +463,33 @@ public class ARBookGameShellController : MonoBehaviour
         SetRootActive(hudRoot, true);
         HideTransientUi();
         HideActionButtons();
+        EnsureMainCameraRendering();
+        ApplyCompanionCameraHud(true);
+        RefreshHud();
+    }
+
+    public void ReturnFromCompanionToGame()
+    {
+        ExitCompanionCameraMode();
+        SetRootActive(homeRoot, false);
+        SetRootActive(companionRoot, false);
+        SetRootActive(backpackRoot, false);
+        SetRootActive(hudRoot, true);
         RefreshAll();
+    }
+
+    private void ExitCompanionCameraMode()
+    {
+        DespawnAllCompanions();
+        activeCompanionId = null;
+        activeCompanionTarget = null;
+        activeSceneCompanionModel = null;
+        selectedCompanionIds.Clear();
+        ApplyCompanionCameraHud(false);
+        ApplySinglePokemonCameraHud(false);
+        SetNonSinglePokemonTargetsActive(true);
+        EnsureMainCameraRendering();
+        SetSinglePokemonTargetsActive(null);
     }
 
 #if false
@@ -452,6 +526,9 @@ public class ARBookGameShellController : MonoBehaviour
     public void DespawnAllCompanions()
     {
         DestroyPlacedCompanions(false);
+        ApplyCompanionCameraHud(false);
+        SetNonSinglePokemonTargetsActive(true);
+        SetSinglePokemonTargetsActive(null);
         RefreshCompanionDetail();
     }
 
@@ -508,7 +585,16 @@ public class ARBookGameShellController : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(captureId))
         {
+            if (!TryConsumeCompanionInteraction())
+            {
+                RefreshCompanionDetail();
+                return;
+            }
+
             AddAffection(captureId, companionInteractionAffectionGain);
+            ARBookCompanionBattleRoster.AddMood(
+                captureId,
+                ARBookCompanionBattleRoster.InteractionMoodGain);
         }
 
         BuildCompanionGrid();
@@ -739,12 +825,24 @@ public class ARBookGameShellController : MonoBehaviour
         homeButton = FindButton(hudRoot, "HomeButton") ?? homeButton;
         placeButton = FindButton(companionRoot, "PlaceButton") ?? placeButton;
         affectionButton = FindButton(companionRoot, "AffectionButton", "InteractButton") ?? affectionButton;
+        affectionButtonText = affectionButton != null
+            ? affectionButton.GetComponentInChildren<TMP_Text>(true)
+            : affectionButtonText;
         clearCompanionsButton = FindButton(companionRoot, "ClearButton", "ClearCompanionsButton") ?? clearCompanionsButton;
         closeCompanionButton = FindButton(companionRoot, "CloseButton", "CloseCompanionButton") ?? closeCompanionButton;
         closeBackpackButton = FindButton(backpackRoot, "CloseButton", "CloseBackpackButton") ?? closeBackpackButton;
         dialogueContinueButton = FindButton(dialogueRoot, "ContinueButton", "NextButton") ?? dialogueContinueButton;
         battleAttackButton = FindButton(battleRoot, "AttackButton") ?? battleAttackButton;
         battleExitButton = FindButton(battleRoot, "ExitButton", "CloseButton") ?? battleExitButton;
+        companionCameraInteractButton =
+            FindButton(hudRoot, "CompanionInteractButton", "CompanionCameraInteractButton") ??
+            companionCameraInteractButton;
+        companionReturnGameButton =
+            FindButton(hudRoot, "CompanionReturnGameButton") ??
+            companionReturnGameButton;
+        companionReturnHomeButton =
+            FindButton(hudRoot, "CompanionReturnHomeButton") ??
+            companionReturnHomeButton;
         startButtonText = startButton != null
             ? startButton.GetComponentInChildren<TMP_Text>(true)
             : null;
@@ -752,12 +850,18 @@ public class ARBookGameShellController : MonoBehaviour
         progressText = FindText(hudRoot, "ProgressText") ?? progressText;
         capturedCountText = FindText(backpackRoot, "BackpackText") ?? capturedCountText;
         companionDetailText = FindText(companionRoot, "DetailText") ?? companionDetailText;
+        companionCameraStatusText =
+            FindText(hudRoot, "CompanionCameraStatusText", "CompanionMoodText") ??
+            companionCameraStatusText;
         dialogueSpeakerText = FindText(dialogueRoot, "SpeakerNameText", "SpeakerName") ?? dialogueSpeakerText;
         dialogueBodyText = FindText(dialogueRoot, "DialogueText") ?? dialogueBodyText;
         battleMessageText = FindText(battleRoot, "BattleMessageText", "MessageText") ?? battleMessageText;
         battleLeftHPText = FindText(battleRoot, "LeftHPText", "EnemyHPText") ?? battleLeftHPText;
         battleRightHPText = FindText(battleRoot, "RightHPText", "PlayerHPText") ?? battleRightHPText;
         hpFill = FindComponentInNamedChild<UIImage>(hudRoot, "HPFill") ?? hpFill;
+        companionMoodFill =
+            FindComponentInNamedChild<UIImage>(hudRoot, "CompanionMoodFill") ??
+            companionMoodFill;
         dialogueLeftHighlight = FindComponentInNamedChild<UIImage>(
             dialogueRoot,
             "LeftSpeakerHighlight") ?? dialogueLeftHighlight;
@@ -789,13 +893,16 @@ public class ARBookGameShellController : MonoBehaviour
     {
         WireButton(startButton, BeginGame);
         WireButton(restartButton, RestartGame);
-        WireButton(homeCompanionButton, OpenCompanionMode);
+        WireButton(homeCompanionButton, OpenCapturedSinglePokemonMode);
         WireButton(backpackButton, OpenBackpack);
-        WireButton(hudCompanionButton, OpenCompanionMode);
+        WireButton(hudCompanionButton, OpenCapturedSinglePokemonMode);
         WireButton(homeButton, ShowHome);
-        WireButton(placeButton, PlaceSelectedCompanions);
+        WireButton(placeButton, ToggleSelectedPartyMember);
         WireButton(affectionButton, AddAffectionToSelected);
-        WireButton(clearCompanionsButton, DespawnAllCompanions);
+        WireButton(companionCameraInteractButton, AddAffectionToSelected);
+        WireButton(companionReturnGameButton, ReturnFromCompanionToGame);
+        WireButton(companionReturnHomeButton, ShowHome);
+        WireButton(clearCompanionsButton, CloseCompanionMode);
         WireButton(closeCompanionButton, CloseCompanionMode);
         WireButton(closeBackpackButton, CloseBackpack);
     }
@@ -863,7 +970,7 @@ public class ARBookGameShellController : MonoBehaviour
         TMP_Text subtitle = CreateText(
             "Subtitle",
             panel,
-            "Open the camera, turn the book pages, explore maps, and capture creatures.",
+            "打开相机，翻动实体书页，在不同地图中收服精灵。",
             24,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
@@ -871,20 +978,20 @@ public class ARBookGameShellController : MonoBehaviour
         subtitle.rectTransform.sizeDelta = new Vector2(690f, 74f);
         subtitle.rectTransform.anchoredPosition = new Vector2(0f, -176f);
 
-        Button start = CreateButton("StartButton", panel, "Start", 32);
+        Button start = CreateButton("StartButton", panel, "开始游戏", 32);
         startButtonText = start.GetComponentInChildren<TMP_Text>();
         SetButtonRect(start, new Vector2(0f, -275f), new Vector2(560f, 76f));
 
-        Button restart = CreateButton("RestartButton", panel, "Restart", 28);
+        Button restart = CreateButton("RestartButton", panel, "重新开始", 28);
         SetButtonRect(restart, new Vector2(0f, -365f), new Vector2(560f, 70f));
 
-        Button companion = CreateButton("CompanionButton", panel, "Companion", 28);
+        Button companion = CreateButton("CompanionButton", panel, "陪伴模式", 28);
         SetButtonRect(companion, new Vector2(0f, -445f), new Vector2(560f, 70f));
 
         TMP_Text footer = CreateText(
             "Footer",
             panel,
-            "Keep the book page in camera view. Recognized maps enable movement, interaction, and capture.",
+            "保持书页完整入镜。识别地图后可以移动、互动、战斗和收服。",
             21,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
@@ -910,7 +1017,7 @@ public class ARBookGameShellController : MonoBehaviour
         TMP_Text title = CreateText(
             "Title",
             panel,
-            "记忆图鉴 AR 冒险",
+            "璁板繂鍥鹃壌 AR 鍐掗櫓",
             48,
             FontStyles.Bold,
             TextAlignmentOptions.Center);
@@ -921,7 +1028,7 @@ public class ARBookGameShellController : MonoBehaviour
         TMP_Text subtitle = CreateText(
             "Subtitle",
             panel,
-            "打开相机，翻动实体书页，在不同地图中收服精灵。",
+            "鎵撳紑鐩告満锛岀炕鍔ㄥ疄浣撲功椤碉紝鍦ㄤ笉鍚屽湴鍥句腑鏀舵湇绮剧伒銆?,
             24,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
@@ -929,20 +1036,20 @@ public class ARBookGameShellController : MonoBehaviour
         subtitle.rectTransform.sizeDelta = new Vector2(690f, 74f);
         subtitle.rectTransform.anchoredPosition = new Vector2(0f, -176f);
 
-        Button startButton = CreateButton("StartButton", panel, "开始游戏", 32);
+        Button startButton = CreateButton("StartButton", panel, "寮€濮嬫父鎴?, 32);
         startButtonText = startButton.GetComponentInChildren<TMP_Text>();
         SetButtonRect(startButton, new Vector2(0f, -275f), new Vector2(560f, 76f));
 
-        Button restartButton = CreateButton("RestartButton", panel, "清空存档 / 重新开始", 28);
+        Button restartButton = CreateButton("RestartButton", panel, "娓呯┖瀛樻。 / 閲嶆柊寮€濮?, 28);
         SetButtonRect(restartButton, new Vector2(0f, -365f), new Vector2(560f, 70f));
 
-        Button companionButton = CreateButton("CompanionButton", panel, "陪伴模式", 28);
+            "陪伴模式",
         SetButtonRect(companionButton, new Vector2(0f, -445f), new Vector2(560f, 70f));
 
         TMP_Text footer = CreateText(
             "Footer",
             panel,
-            "进入游戏后保持摄像头对准书页，识别任意地图图像后即可移动、互动和收服。",
+            "杩涘叆娓告垙鍚庝繚鎸佹憚鍍忓ご瀵瑰噯涔﹂〉锛岃瘑鍒换鎰忓湴鍥惧浘鍍忓悗鍗冲彲绉诲姩銆佷簰鍔ㄥ拰鏀舵湇銆?,
             21,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
@@ -1030,9 +1137,35 @@ public class ARBookGameShellController : MonoBehaviour
         buttons.sizeDelta = new Vector2(620f, 88f);
         buttons.anchoredPosition = new Vector2(-28f, 34f);
         AddEditableBackground(buttons);
-        CreateButton("BackpackButton", buttons, "Bag", 24);
-        CreateButton("CompanionButton", buttons, "Companion", 24);
-        CreateButton("HomeButton", buttons, "Home", 24);
+        Button backpackButton = CreateButton("BackpackButton", buttons, "背包", 24);
+        Button companionButton = CreateButton("CompanionButton", buttons, "陪伴", 24);
+        Button homeButton = CreateButton("HomeButton", buttons, "首页", 24);
+
+        companionCameraStatusText = CreateText(
+            "CompanionCameraStatusText",
+            root,
+            string.Empty,
+            18,
+            FontStyles.Normal,
+            TextAlignmentOptions.Center);
+        SetAnchors(companionCameraStatusText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        companionCameraStatusText.rectTransform.sizeDelta = new Vector2(520f, 46f);
+        companionCameraStatusText.rectTransform.anchoredPosition = new Vector2(0f, -52f);
+
+        RectTransform moodBack = CreateRect("CompanionMoodBack", root);
+        SetAnchors(moodBack, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        moodBack.sizeDelta = new Vector2(520f, 24f);
+        moodBack.anchoredPosition = new Vector2(0f, -88f);
+        moodBack.gameObject.AddComponent<UIImage>().raycastTarget = false;
+        companionMoodFill = CreateImage("CompanionMoodFill", moodBack, null);
+        Stretch(companionMoodFill.rectTransform, 4f, 4f, 4f, 4f);
+
+        companionReturnGameButton = CreateButton("CompanionReturnGameButton", root, "返回游戏", 22);
+        SetButtonRect(companionReturnGameButton, new Vector2(-250f, 58f), new Vector2(190f, 68f));
+        companionCameraInteractButton = CreateButton("CompanionInteractButton", root, "互动", 24);
+        SetButtonRect(companionCameraInteractButton, new Vector2(0f, 58f), new Vector2(220f, 76f));
+        companionReturnHomeButton = CreateButton("CompanionReturnHomeButton", root, "返回首页", 22);
+        SetButtonRect(companionReturnHomeButton, new Vector2(250f, 58f), new Vector2(190f, 68f));
 
         RectTransform hint = CreatePanel(
             "CameraHint",
@@ -1175,7 +1308,7 @@ public class ARBookGameShellController : MonoBehaviour
         TMP_Text title = CreateText(
             "Title",
             panel,
-            "陪伴模式",
+            "宝可梦",
             38,
             FontStyles.Bold,
             TextAlignmentOptions.Left);
@@ -1214,8 +1347,8 @@ public class ARBookGameShellController : MonoBehaviour
         actions.offsetMin = new Vector2(38f, 30f);
         actions.offsetMax = new Vector2(-38f, 98f);
         AddEditableBackground(actions);
-        Button placeButton = CreateButton("PlaceButton", actions, "放置选中", 24);
-        Button affectionButton = CreateButton("AffectionButton", actions, "互动 + 好感", 24);
+        Button placeButton = CreateButton("PlaceButton", actions, "携带", 24);
+        Button affectionButton = CreateButton("AffectionButton", actions, "陪伴", 24);
         Button clearButton = CreateButton("ClearButton", actions, "收回全部", 24);
         Button closeButton = CreateButton("CloseButton", actions, "返回", 24);
 
@@ -1308,7 +1441,7 @@ public class ARBookGameShellController : MonoBehaviour
         dialogueBodyText.rectTransform.offsetMin = new Vector2(120f, 34f);
         dialogueBodyText.rectTransform.offsetMax = new Vector2(-220f, -84f);
 
-        dialogueContinueButton = CreateButton("ContinueButton", panel, "Continue", 23);
+        dialogueContinueButton = CreateButton("ContinueButton", panel, "继续", 23);
         SetButtonRect(dialogueContinueButton, new Vector2(0f, 0f), new Vector2(180f, 62f));
         RectTransform buttonRect = dialogueContinueButton.GetComponent<RectTransform>();
         SetAnchors(buttonRect, new Vector2(1f, 0f), new Vector2(1f, 0f));
@@ -1355,7 +1488,7 @@ public class ARBookGameShellController : MonoBehaviour
         battleMessageText = CreateText(
             "BattleMessageText",
             controls,
-            "Choose action",
+            "选择行动",
             26,
             FontStyles.Bold,
             TextAlignmentOptions.Left);
@@ -1363,13 +1496,25 @@ public class ARBookGameShellController : MonoBehaviour
         battleMessageText.rectTransform.offsetMin = new Vector2(40f, 24f);
         battleMessageText.rectTransform.offsetMax = new Vector2(-560f, -24f);
 
-        battleAttackButton = CreateButton("AttackButton", controls, "Attack", 32);
+        battleAttackButton = CreateButton("AttackButton", controls, "攻击", 32);
         SetButtonRect(battleAttackButton, new Vector2(0f, 0f), new Vector2(310f, 92f));
         RectTransform attackRect = battleAttackButton.GetComponent<RectTransform>();
         SetAnchors(attackRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
         attackRect.anchoredPosition = new Vector2(260f, 0f);
 
-        battleExitButton = CreateButton("ExitButton", controls, "Exit", 24);
+        Button companionAButton = CreateButton("CompanionAButton", controls, "A 宝可梦攻击", 22);
+        RectTransform companionARect = companionAButton.GetComponent<RectTransform>();
+        SetAnchors(companionARect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        companionARect.sizeDelta = new Vector2(260f, 64f);
+        companionARect.anchoredPosition = new Vector2(-100f, 38f);
+
+        Button companionBButton = CreateButton("CompanionBButton", controls, "B 宝可梦攻击", 22);
+        RectTransform companionBRect = companionBButton.GetComponent<RectTransform>();
+        SetAnchors(companionBRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        companionBRect.sizeDelta = new Vector2(260f, 64f);
+        companionBRect.anchoredPosition = new Vector2(-100f, -38f);
+
+        battleExitButton = CreateButton("ExitButton", controls, "退出", 24);
         SetButtonRect(battleExitButton, new Vector2(0f, 0f), new Vector2(180f, 66f));
         RectTransform exitRect = battleExitButton.GetComponent<RectTransform>();
         SetAnchors(exitRect, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
@@ -1447,7 +1592,7 @@ public class ARBookGameShellController : MonoBehaviour
         bool hasStarted = PlayerPrefs.GetInt(StartedKey, 0) == 1 ||
                           GetCapturedIds().Count > 0 ||
                           HasAnyCompletedChapter();
-        startButtonText.text = hasStarted ? "Continue" : "Start";
+        startButtonText.text = hasStarted ? "继续游戏" : "开始游戏";
     }
 
 #if false
@@ -1493,6 +1638,216 @@ public class ARBookGameShellController : MonoBehaviour
         {
             progressText.text = BuildProgressText();
         }
+
+        SetNamedChildActive(hudRoot, "CompanionButton", false);
+        SetNamedChildActive(hudRoot, "HUDCompanionButton", false);
+
+        if (companionCameraModeActive)
+        {
+            RefreshCompanionCameraHud();
+            return;
+        }
+
+        if (singlePokemonCameraModeActive)
+        {
+            ApplySinglePokemonCameraHud(true);
+            return;
+        }
+
+        RefreshCompanionCameraHud();
+    }
+
+    private void ApplyCompanionCameraHud(bool active)
+    {
+        companionCameraModeActive = active;
+        if (active)
+        {
+            singlePokemonCameraModeActive = false;
+        }
+
+        if (hudRoot == null)
+        {
+            return;
+        }
+
+        SetNamedChildActive(hudRoot, "PlayerStatus", !active);
+        SetNamedChildActive(hudRoot, "TaskPanel", !active);
+        SetNamedChildActive(hudRoot, "CameraHint", !active);
+        SetNamedChildActive(hudRoot, "HUDButtons", true);
+        SetNamedChildActive(hudRoot, "BackpackButton", !active);
+        SetNamedChildActive(hudRoot, "CompanionButton", false);
+        SetNamedChildActive(hudRoot, "HUDCompanionButton", false);
+        SetNamedChildActive(hudRoot, "CompanionMoodBack", active);
+        SetNamedChildActive(hudRoot, "CompanionMoodFill", active);
+
+        if (companionCameraStatusText != null)
+        {
+            SetActiveIfChanged(companionCameraStatusText.gameObject, active);
+        }
+
+        if (companionCameraInteractButton != null)
+        {
+            SetActiveIfChanged(companionCameraInteractButton.gameObject, active);
+        }
+
+        if (companionReturnGameButton != null)
+        {
+            SetActiveIfChanged(companionReturnGameButton.gameObject, active);
+        }
+
+        if (companionReturnHomeButton != null)
+        {
+            SetActiveIfChanged(companionReturnHomeButton.gameObject, active);
+        }
+
+        RefreshCompanionCameraHud();
+    }
+
+    private void ApplySinglePokemonCameraHud(bool active)
+    {
+        singlePokemonCameraModeActive = active;
+        if (active)
+        {
+            companionCameraModeActive = false;
+        }
+
+        if (hudRoot == null)
+        {
+            return;
+        }
+
+        if (!active)
+        {
+            if (companionReturnHomeButton != null)
+            {
+                SetActiveIfChanged(companionReturnHomeButton.gameObject, false);
+            }
+
+            return;
+        }
+
+        SetNamedChildActive(hudRoot, "PlayerStatus", false);
+        SetNamedChildActive(hudRoot, "TaskPanel", false);
+        SetNamedChildActive(hudRoot, "CameraHint", false);
+        SetNamedChildActive(hudRoot, "HUDButtons", true);
+        SetNamedChildActive(hudRoot, "BackpackButton", false);
+        SetNamedChildActive(hudRoot, "CompanionButton", false);
+        SetNamedChildActive(hudRoot, "HUDCompanionButton", false);
+        SetNamedChildActive(hudRoot, "HomeButton", false);
+        SetNamedChildActive(hudRoot, "CompanionMoodBack", false);
+        SetNamedChildActive(hudRoot, "CompanionMoodFill", false);
+
+        if (companionCameraStatusText != null)
+        {
+            SetActiveIfChanged(companionCameraStatusText.gameObject, false);
+        }
+
+        if (companionCameraInteractButton != null)
+        {
+            SetActiveIfChanged(companionCameraInteractButton.gameObject, false);
+        }
+
+        if (companionReturnGameButton != null)
+        {
+            SetActiveIfChanged(companionReturnGameButton.gameObject, false);
+        }
+
+        if (companionReturnHomeButton != null)
+        {
+            SetActiveIfChanged(companionReturnHomeButton.gameObject, active);
+        }
+    }
+
+    private void RefreshCompanionCameraHud()
+    {
+        bool active = companionCameraModeActive &&
+            !string.IsNullOrWhiteSpace(activeCompanionId) &&
+            hudRoot != null &&
+            hudRoot.gameObject.activeInHierarchy &&
+            (companionRoot == null || !companionRoot.gameObject.activeInHierarchy);
+
+        if (companionCameraStatusText != null)
+        {
+            SetActiveIfChanged(companionCameraStatusText.gameObject, active);
+            if (active)
+            {
+                CompanionDefinition definition = FindCompanion(activeCompanionId);
+                string display = definition != null
+                    ? definition.displayName
+                    : activeCompanionId;
+                string targetName = definition != null
+                    ? GetCompanionTargetName(definition)
+                    : activeCompanionId;
+                bool tracked = IsTracked(activeCompanionTarget);
+                int mood = ARBookCompanionBattleRoster.GetMood(activeCompanionId);
+                companionCameraStatusText.text =
+                    tracked
+                        ? $"{display}  心情 {mood}  好感 {GetAffection(activeCompanionId)}"
+                        : $"{display}\n请扫描 {targetName} 图片";
+
+                if (companionMoodFill != null)
+                {
+                    companionMoodFill.rectTransform.anchorMax =
+                        new Vector2(Mathf.Clamp01(mood / 100f), 1f);
+                }
+            }
+        }
+
+        if (companionCameraInteractButton != null)
+        {
+            SetActiveIfChanged(companionCameraInteractButton.gameObject, active);
+            companionCameraInteractButton.interactable =
+                active && GetCompanionInteractionsRemaining() > 0;
+        }
+
+        if (companionReturnGameButton != null)
+        {
+            SetActiveIfChanged(companionReturnGameButton.gameObject, active);
+        }
+
+        if (companionReturnHomeButton != null)
+        {
+            SetActiveIfChanged(companionReturnHomeButton.gameObject, active);
+        }
+    }
+
+    private static void SetActiveIfChanged(GameObject target, bool active)
+    {
+        if (target != null && target.activeSelf != active)
+        {
+            target.SetActive(active);
+        }
+    }
+
+    private static void SetNamedChildActive(
+        Transform root,
+        string childName,
+        bool active)
+    {
+        Transform child = FindDescendant(root, childName);
+        if (child != null)
+        {
+            SetActiveIfChanged(child.gameObject, active);
+        }
+    }
+
+    private static void EnsureMainCameraRendering()
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            return;
+        }
+
+        if (!mainCamera.gameObject.activeSelf)
+        {
+            mainCamera.gameObject.SetActive(true);
+        }
+
+        if (!mainCamera.enabled)
+        {
+            mainCamera.enabled = true;
+        }
     }
 
     private void RefreshBackpack()
@@ -1504,10 +1859,104 @@ public class ARBookGameShellController : MonoBehaviour
 
         List<string> captured = GetCapturedIds();
         int completedChapters = GetCompletedChapterCount();
+        string[] party = ARBookCompanionBattleRoster.GetParty();
+        string selected = string.IsNullOrWhiteSpace(selectedBackpackPartyId)
+            ? "未选择"
+            : selectedBackpackPartyId;
         capturedCountText.text =
             $"已收服精灵：{captured.Count}\n" +
-            $"已探索地图：{completedChapters} / 5\n\n" +
+            $"已探索地图：{completedChapters} / 5\n" +
+            $"携带A：{(string.IsNullOrWhiteSpace(party[0]) ? "空" : party[0])}\n" +
+            $"携带B：{(string.IsNullOrWhiteSpace(party[1]) ? "空" : party[1])}\n" +
+            $"当前选择：{selected}\n\n" +
             BuildCapturedNameList(captured);
+
+        RebuildBackpackPartyButtons(captured);
+    }
+
+    private void RebuildBackpackPartyButtons(List<string> captured)
+    {
+        if (backpackRoot == null)
+        {
+            return;
+        }
+
+        Transform oldRoot = FindDescendant(backpackRoot, "PartyButtons");
+        if (oldRoot != null)
+        {
+            DestroyRuntimeObject(oldRoot.gameObject, false);
+        }
+
+        RectTransform buttonRoot = CreateRect("PartyButtons", backpackRoot);
+        SetAnchors(buttonRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        buttonRoot.sizeDelta = new Vector2(690f, 190f);
+        buttonRoot.anchoredPosition = new Vector2(0f, -86f);
+
+        int visible = 0;
+        for (int i = 0; i < captured.Count; i++)
+        {
+            string captureId = captured[i];
+            CompanionDefinition definition = FindCompanion(captureId);
+            string display = definition != null ? definition.displayName : captureId;
+            bool selected = string.Equals(
+                selectedBackpackPartyId,
+                captureId,
+                StringComparison.OrdinalIgnoreCase);
+            Button button = CreateButton(
+                $"Party_{captureId}",
+                buttonRoot,
+                selected ? $"已选 {display}" : $"选择 {display}",
+                18);
+            RectTransform rect = button.GetComponent<RectTransform>();
+            SetAnchors(rect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+            rect.sizeDelta = new Vector2(210f, 44f);
+            rect.anchoredPosition = new Vector2(
+                -230f + (visible % 3) * 230f,
+                -24f - (visible / 3) * 52f);
+            string id = captureId;
+            button.onClick.AddListener(() => SelectBackpackPartyMember(id));
+            visible++;
+        }
+
+        Button confirmButton = CreateButton(
+            "ConfirmPartyButton",
+            buttonRoot,
+            BuildConfirmPartyButtonText(),
+            20);
+        RectTransform confirmRect = confirmButton.GetComponent<RectTransform>();
+        SetAnchors(confirmRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+        confirmRect.sizeDelta = new Vector2(280f, 50f);
+        confirmRect.anchoredPosition = new Vector2(0f, 20f);
+        confirmButton.onClick.AddListener(ConfirmBackpackPartyMember);
+    }
+
+    private void SelectBackpackPartyMember(string captureId)
+    {
+        selectedBackpackPartyId = captureId;
+        RefreshBackpack();
+    }
+
+    private void ConfirmBackpackPartyMember()
+    {
+        if (string.IsNullOrWhiteSpace(selectedBackpackPartyId))
+        {
+            return;
+        }
+
+        ARBookCompanionBattleRoster.TogglePartyMember(selectedBackpackPartyId);
+        RefreshBackpack();
+    }
+
+    private string BuildConfirmPartyButtonText()
+    {
+        if (string.IsNullOrWhiteSpace(selectedBackpackPartyId))
+        {
+            return "先选择宝可梦";
+        }
+
+        return ARBookCompanionBattleRoster.IsInParty(selectedBackpackPartyId)
+            ? "确认取消携带"
+            : "确认携带";
     }
 
     private void BuildCompanionGrid()
@@ -1519,6 +1968,11 @@ public class ARBookGameShellController : MonoBehaviour
 
         ClearChildren(companionGrid);
         int visibleCount = 0;
+        if (companions == null)
+        {
+            companions = new CompanionDefinition[0];
+        }
+
         for (int i = 0; i < companions.Length; i++)
         {
             CompanionDefinition definition = companions[i];
@@ -1573,7 +2027,7 @@ public class ARBookGameShellController : MonoBehaviour
             TMP_Text empty = CreateText(
                 "Empty",
                 companionGrid,
-                "还没有已收服的精灵",
+                "杩樻病鏈夊凡鏀舵湇鐨勭簿鐏?,
                 24,
                 FontStyles.Normal,
                 TextAlignmentOptions.Center);
@@ -1619,8 +2073,8 @@ public class ARBookGameShellController : MonoBehaviour
             card,
             definition);
         SetAnchors(portraitRect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-        portraitRect.sizeDelta = new Vector2(118f, 118f);
-        portraitRect.anchoredPosition = new Vector2(0f, -70f);
+        portraitRect.sizeDelta = new Vector2(132f, 112f);
+        portraitRect.anchoredPosition = new Vector2(0f, -64f);
 
         TMP_Text nameText = CreateText(
             "Name",
@@ -1636,14 +2090,25 @@ public class ARBookGameShellController : MonoBehaviour
         TMP_Text affectionText = CreateText(
             "Affection",
             card,
-            $"好感 {GetAffection(definition.captureId)}",
-            17,
+            BuildCompanionCardStats(definition.captureId),
+            15,
             FontStyles.Normal,
             TextAlignmentOptions.Center);
         SetAnchors(affectionText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f));
-        affectionText.rectTransform.offsetMin = new Vector2(10f, 14f);
-        affectionText.rectTransform.offsetMax = new Vector2(-10f, 40f);
+        affectionText.rectTransform.offsetMin = new Vector2(10f, 34f);
+        affectionText.rectTransform.offsetMax = new Vector2(-10f, 72f);
+
         DisableChildRaycasts(card, card.GetComponent<Graphic>());
+    }
+
+    private string BuildCompanionCardStats(string captureId)
+    {
+        string carried = ARBookCompanionBattleRoster.IsInParty(captureId)
+            ? "已携带"
+            : "未携带";
+        return
+            $"好感 {GetAffection(captureId)}  心情 {ARBookCompanionBattleRoster.GetMood(captureId)}\n" +
+            $"攻击 {ARBookCompanionBattleRoster.GetAttack(captureId)}  {carried}";
     }
 
     private void ToggleCompanionSelection(string captureId)
@@ -1653,11 +2118,25 @@ public class ARBookGameShellController : MonoBehaviour
 
         BuildCompanionGrid();
         RefreshCompanionDetail();
-        PlaceSelectedCompanions();
+    }
+
+    private void ToggleSelectedPartyMember()
+    {
+        string captureId = GetSelectedCompanionId();
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            RefreshCompanionDetail();
+            return;
+        }
+
+        ARBookCompanionBattleRoster.TogglePartyMember(captureId);
+        BuildCompanionGrid();
+        RefreshCompanionDetail();
     }
 
     private void RefreshCompanionDetail()
     {
+        RefreshPokemonPanelButtons();
         if (companionDetailText == null)
         {
             return;
@@ -1666,23 +2145,72 @@ public class ARBookGameShellController : MonoBehaviour
         if (selectedCompanionIds.Count == 0)
         {
             companionDetailText.text =
-                "\u9009\u62e9\u4e00\u4e2a\u5df2\u6536\u670d\u7684\u7cbe\u7075\u3002\n\n" +
-                "\u786e\u8ba4\uff1a\u5173\u95ed\u7a97\u53e3\u5e76\u56de\u5230\u6444\u50cf\u5934\u753b\u9762\u3002\n" +
-                "\u8bc6\u522b\uff1a\u5bf9\u51c6\u5bf9\u5e94\u5b9d\u53ef\u68a6\u56fe\u7247\u540e\u663e\u793a\u6a21\u578b\u3002\n" +
-                "\u4e92\u52a8\uff1a\u70b9\u51fb\u6a21\u578b\u6216\u6309\u94ae\u63d0\u5347\u597d\u611f\u5ea6\u3002";
+                "选择一个已收服的宝可梦。\n\n" +
+                "携带：加入或移出战斗携带位，最多两个。\n" +
+                "互动：增加好感和心情。\n" +
+                "返回：关闭面板。";
             return;
         }
 
-        string text = "\u5df2\u9009\u62e9\uff1a\n";
+        string text = "已选择：\n";
         foreach (string captureId in selectedCompanionIds)
         {
             CompanionDefinition definition = FindCompanion(captureId);
             string display = definition != null ? definition.displayName : captureId;
-            text += $"- {display}  \u597d\u611f {GetAffection(captureId)}\n";
+            text +=
+                $"- {display}  好感 {GetAffection(captureId)}  " +
+                $"心情 {ARBookCompanionBattleRoster.GetMood(captureId)}  " +
+                $"攻击 {ARBookCompanionBattleRoster.GetAttack(captureId)}\n";
         }
 
-        text += $"\n\u5df2\u653e\u7f6e\uff1a{placedCompanions.Count} / 1";
+        string[] party = ARBookCompanionBattleRoster.GetParty();
+        text += $"\n携带A：{(string.IsNullOrWhiteSpace(party[0]) ? "空" : party[0])}";
+        text += $"\n携带B：{(string.IsNullOrWhiteSpace(party[1]) ? "空" : party[1])}";
+        text += $"\n\n互动次数：{GetCompanionInteractionsRemaining()} / {maxCompanionInteractionsPerGame}";
         companionDetailText.text = text;
+    }
+
+    private void RefreshPokemonPanelButtons()
+    {
+        string captureId = GetSelectedCompanionId();
+        SetButtonText(
+            placeButton,
+            !string.IsNullOrWhiteSpace(captureId) &&
+            ARBookCompanionBattleRoster.IsInParty(captureId)
+                ? "已携带"
+                : "携带");
+        SetButtonText(affectionButton, "互动");
+        SetButtonText(clearCompanionsButton, "返回");
+        SetButtonText(closeCompanionButton, "返回");
+
+        if (placeButton != null)
+        {
+            placeButton.interactable = !string.IsNullOrWhiteSpace(captureId);
+        }
+
+        if (affectionButton != null)
+        {
+            affectionButton.interactable = !string.IsNullOrWhiteSpace(captureId);
+        }
+
+        if (clearCompanionsButton != null)
+        {
+            clearCompanionsButton.gameObject.SetActive(false);
+        }
+    }
+
+    private static void SetButtonText(Button button, string text)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.text = text;
+        }
     }
 
 #if false
@@ -1696,21 +2224,21 @@ public class ARBookGameShellController : MonoBehaviour
         if (selectedCompanionIds.Count == 0)
         {
             companionDetailText.text =
-                "选择一个或多个已收服精灵。\n\n" +
-                "放置：把模型生成到相机前方或你配置的放置根节点下。\n" +
-                "互动：提升好感度，后续可以接动画或事件。";
+                "閫夋嫨涓€涓垨澶氫釜宸叉敹鏈嶇簿鐏点€俓n\n" +
+                "鏀剧疆锛氭妸妯″瀷鐢熸垚鍒扮浉鏈哄墠鏂规垨浣犻厤缃殑鏀剧疆鏍硅妭鐐逛笅銆俓n" +
+                "浜掑姩锛氭彁鍗囧ソ鎰熷害锛屽悗缁彲浠ユ帴鍔ㄧ敾鎴栦簨浠躲€?;
             return;
         }
 
-        string text = "已选择：\n";
+        string text = "宸查€夋嫨锛歕n";
         foreach (string captureId in selectedCompanionIds)
         {
             CompanionDefinition definition = FindCompanion(captureId);
             string name = definition != null ? definition.displayName : captureId;
-            text += $"- {name}  好感 {GetAffection(captureId)}\n";
+            text += $"- {name}  濂芥劅 {GetAffection(captureId)}\n";
         }
 
-        text += $"\n当前场上：{placedCompanions.Count} / {maxActiveCompanions}";
+        text += $"\n褰撳墠鍦轰笂锛歿placedCompanions.Count} / {maxActiveCompanions}";
         companionDetailText.text = text;
     }
 
@@ -1767,6 +2295,11 @@ public class ARBookGameShellController : MonoBehaviour
             return captureId;
         }
 
+        if (!string.IsNullOrWhiteSpace(selectedBackpackPartyId))
+        {
+            return selectedBackpackPartyId;
+        }
+
         return null;
     }
 
@@ -1812,7 +2345,16 @@ public class ARBookGameShellController : MonoBehaviour
     {
         if (!string.IsNullOrWhiteSpace(activeCompanionId))
         {
+            if (!TryConsumeCompanionInteraction())
+            {
+                RefreshCompanionDetail();
+                return;
+            }
+
             AddAffection(activeCompanionId, companionInteractionAffectionGain);
+            ARBookCompanionBattleRoster.AddMood(
+                activeCompanionId,
+                ARBookCompanionBattleRoster.InteractionMoodGain);
             RefreshCompanionDetail();
         }
     }
@@ -1917,6 +2459,57 @@ public class ARBookGameShellController : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    private int GetCompanionInteractionsUsed()
+    {
+        return PlayerPrefs.GetInt(CompanionInteractionCountKey, 0);
+    }
+
+    private int GetCompanionInteractionsRemaining()
+    {
+        return Mathf.Max(
+            0,
+            maxCompanionInteractionsPerGame - GetCompanionInteractionsUsed());
+    }
+
+    private bool TryConsumeCompanionInteraction()
+    {
+        if (GetCompanionInteractionsRemaining() <= 0)
+        {
+            if (companionDetailText != null)
+            {
+                companionDetailText.text = "本局互动次数已经用完。战斗后心情会慢慢恢复，也可以重新开始清空次数。";
+            }
+
+            RefreshCompanionInteractionButton();
+            return false;
+        }
+
+        PlayerPrefs.SetInt(
+            CompanionInteractionCountKey,
+            GetCompanionInteractionsUsed() + 1);
+        PlayerPrefs.Save();
+        RefreshCompanionInteractionButton();
+        return true;
+    }
+
+    private void RefreshCompanionInteractionButton()
+    {
+        if (companionCameraInteractButton != null)
+        {
+            TMP_Text label =
+                companionCameraInteractButton.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                label.text =
+                    $"互动（{GetCompanionInteractionsRemaining()}/{maxCompanionInteractionsPerGame}）";
+            }
+
+            companionCameraInteractButton.interactable =
+                !string.IsNullOrWhiteSpace(activeCompanionId) &&
+                GetCompanionInteractionsRemaining() > 0;
+        }
+    }
+
     private Transform ResolveCompanionParent(CompanionDefinition definition)
     {
         VuforiaObserverBehaviour target = activeCompanionTarget;
@@ -2019,6 +2612,52 @@ public class ARBookGameShellController : MonoBehaviour
         }
     }
 
+    private void SetAllSinglePokemonTargetsActive()
+    {
+        Transform root = FindSinglePokemonRoot();
+        if (root == null)
+        {
+            return;
+        }
+
+        root.gameObject.SetActive(true);
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            VuforiaObserverBehaviour observer =
+                child.GetComponent<VuforiaObserverBehaviour>();
+            child.gameObject.SetActive(observer != null);
+        }
+    }
+
+    private void SetNonSinglePokemonTargetsActive(bool active)
+    {
+        Transform singleRoot = FindSinglePokemonRoot();
+        VuforiaObserverBehaviour[] observers =
+            FindObjectsOfType<VuforiaObserverBehaviour>(true);
+        for (int i = 0; i < observers.Length; i++)
+        {
+            VuforiaObserverBehaviour observer = observers[i];
+            if (observer == null)
+            {
+                continue;
+            }
+
+            if (singleRoot != null && observer.transform.IsChildOf(singleRoot))
+            {
+                continue;
+            }
+
+            if (!observer.gameObject.activeSelf && active)
+            {
+                observer.gameObject.SetActive(true);
+            }
+
+            observer.enabled = active;
+        }
+    }
+
     private static GameObject ResolveSinglePokemonSceneModel(
         VuforiaObserverBehaviour target)
     {
@@ -2109,8 +2748,9 @@ public class ARBookGameShellController : MonoBehaviour
                 instance.transform.localRotation = Quaternion.identity;
             }
 
-            instance.SetActive(!hideCompanionUntilImageTracked ||
-                IsTracked(activeCompanionTarget));
+            bool tracked = IsTracked(activeCompanionTarget);
+            instance.SetActive(!hideCompanionUntilImageTracked || tracked);
+            RefreshCompanionCameraHud();
             return;
         }
 
@@ -2122,6 +2762,7 @@ public class ARBookGameShellController : MonoBehaviour
         }
 
         instance.SetActive(!hideCompanionUntilImageTracked);
+        RefreshCompanionCameraHud();
     }
 
     private static void EnsureCompanionColliders(GameObject instance)
@@ -2281,26 +2922,26 @@ public class ARBookGameShellController : MonoBehaviour
                 objective.CollectedCount,
                 objective.requiredCollectibleCount);
             string state = objective.IsObjectiveCompleted
-                ? "已完成"
+                ? "宸插畬鎴?
                 : $"{count} / {objective.requiredCollectibleCount}";
-            return $"地图 {objective.chapterId}\n[当前] 任务进度：{state}";
+            return $"鍦板浘 {objective.chapterId}\n[褰撳墠] 浠诲姟杩涘害锛歿state}";
         }
 
         ARBookChallenge challenge = FindActiveChallenge();
         if (challenge != null)
         {
             return challenge.IsCompleted
-                ? $"地图 {challenge.chapterId}\n[完成] 机关已完成，寻找并收服这张地图的精灵"
-                : $"地图 {challenge.chapterId}\n[当前] 完成地图机关，并寻找可以收服的精灵";
+                ? $"鍦板浘 {challenge.chapterId}\n[瀹屾垚] 鏈哄叧宸插畬鎴愶紝瀵绘壘骞舵敹鏈嶈繖寮犲湴鍥剧殑绮剧伒"
+                : $"鍦板浘 {challenge.chapterId}\n[褰撳墠] 瀹屾垚鍦板浘鏈哄叧锛屽苟瀵绘壘鍙互鏀舵湇鐨勭簿鐏?;
         }
 
         int activeMap = DetectActiveChapter();
         if (activeMap > 0)
         {
-            return $"地图 {activeMap}\n[当前] 探索地图，寻找可以对话和收服的精灵";
+            return $"鍦板浘 {activeMap}\n[褰撳墠] 鎺㈢储鍦板浘锛屽鎵惧彲浠ュ璇濆拰鏀舵湇鐨勭簿鐏?;
         }
 
-        return "等待识别地图书页\n[当前] 翻开任意地图图片开始冒险";
+        return "绛夊緟璇嗗埆鍦板浘涔﹂〉\n[褰撳墠] 缈诲紑浠绘剰鍦板浘鍥剧墖寮€濮嬪啋闄?;
     }
 
 #if false
@@ -2321,24 +2962,24 @@ public class ARBookGameShellController : MonoBehaviour
         if (objective != null)
         {
             objective.RefreshUI();
-            return $"地图 {objective.chapterId}\n[当前] {objective.GetProgressText()}";
+            return $"鍦板浘 {objective.chapterId}\n[褰撳墠] {objective.GetProgressText()}";
         }
 
         ARBookChallenge challenge = FindActiveChallenge();
         if (challenge != null)
         {
             return challenge.IsCompleted
-                ? $"地图 {challenge.chapterId}\n[完成] 机关已完成，寻找并收服这张地图的精灵"
-                : $"地图 {challenge.chapterId}\n[当前] 完成地图机关并寻找可收服精灵";
+                ? $"鍦板浘 {challenge.chapterId}\n[瀹屾垚] 鏈哄叧宸插畬鎴愶紝瀵绘壘骞舵敹鏈嶈繖寮犲湴鍥剧殑绮剧伒"
+                : $"鍦板浘 {challenge.chapterId}\n[褰撳墠] 瀹屾垚鍦板浘鏈哄叧骞跺鎵惧彲鏀舵湇绮剧伒";
         }
 
         int activeMap = DetectActiveChapter();
         if (activeMap > 0)
         {
-            return $"地图 {activeMap}\n[当前] 探索地图，寻找可对话和可收服的精灵";
+            return $"鍦板浘 {activeMap}\n[褰撳墠] 鎺㈢储鍦板浘锛屽鎵惧彲瀵硅瘽鍜屽彲鏀舵湇鐨勭簿鐏?;
         }
 
-        return "等待识别地图书页\n[当前] 翻开任意地图图片开始冒险";
+        return "绛夊緟璇嗗埆鍦板浘涔﹂〉\n[褰撳墠] 缈诲紑浠绘剰鍦板浘鍥剧墖寮€濮嬪啋闄?;
     }
 
 #endif
@@ -2348,40 +2989,40 @@ public class ARBookGameShellController : MonoBehaviour
         int currentChapter = DetectActiveChapter();
         int completed = GetCompletedChapterCount();
         string current = currentChapter > 0
-            ? $"当前地图：{currentChapter} / 5"
-            : "当前地图：未识别";
-        return $"{current}\n已探索地图：{completed} / 5\n识别书页后，任务栏会自动更新。";
+            ? $"褰撳墠鍦板浘锛歿currentChapter} / 5"
+            : "褰撳墠鍦板浘锛氭湭璇嗗埆";
+        return $"{current}\n宸叉帰绱㈠湴鍥撅細{completed} / 5\n璇嗗埆涔﹂〉鍚庯紝浠诲姟鏍忎細鑷姩鏇存柊銆?;
     }
 
     private string BuildQuestTrackerText(ARBookQuestTracker tracker)
     {
         string title = tracker.chapterId == 1
-            ? "第一章：森林初遇"
-            : $"地图 {tracker.chapterId}";
+            ? "绗竴绔狅細妫灄鍒濋亣"
+            : $"鍦板浘 {tracker.chapterId}";
 
         string stepText;
         switch (tracker.CurrentStep)
         {
             case ARBookQuestTracker.QuestStep.TalkToMentor:
-                stepText = "与导师交谈";
+                stepText = "涓庡甯堜氦璋?;
                 break;
             case ARBookQuestTracker.QuestStep.CollectFragments:
                 stepText = BuildCollectFragmentsText(tracker);
                 break;
             case ARBookQuestTracker.QuestStep.TalkToCreature:
-                stepText = $"与 {GetTrackerCreatureName(tracker)} 交谈";
+                stepText = $"涓?{GetTrackerCreatureName(tracker)} 浜よ皥";
                 break;
             case ARBookQuestTracker.QuestStep.CaptureCreature:
-                stepText = $"收服 {GetTrackerCreatureName(tracker)}";
+                stepText = $"鏀舵湇 {GetTrackerCreatureName(tracker)}";
                 break;
             case ARBookQuestTracker.QuestStep.ReachChapterEnd:
-                stepText = "前往地图终点";
+                stepText = "鍓嶅線鍦板浘缁堢偣";
                 break;
             default:
-                return $"{title}\n[完成] 地图任务完成";
+                return $"{title}\n[瀹屾垚] 鍦板浘浠诲姟瀹屾垚";
         }
 
-        return $"{title}\n[当前] {stepText}";
+        return $"{title}\n[褰撳墠] {stepText}";
     }
 
     private string BuildCollectFragmentsText(ARBookQuestTracker tracker)
@@ -2389,13 +3030,13 @@ public class ARBookGameShellController : MonoBehaviour
         ARBookChapterObjectiveManager objective = tracker.objectiveManager;
         if (objective == null)
         {
-            return "收集任务物品";
+            return "鏀堕泦浠诲姟鐗╁搧";
         }
 
         int count = Mathf.Min(
             objective.CollectedCount,
             objective.requiredCollectibleCount);
-        return $"收集任务物品 ({count} / {objective.requiredCollectibleCount})";
+        return $"鏀堕泦浠诲姟鐗╁搧 ({count} / {objective.requiredCollectibleCount})";
     }
 
     private static string GetTrackerCreatureName(ARBookQuestTracker tracker)
@@ -2406,7 +3047,7 @@ public class ARBookGameShellController : MonoBehaviour
         }
 
         return string.IsNullOrWhiteSpace(tracker.requiredCaptureId)
-            ? "精灵"
+            ? "绮剧伒"
             : tracker.requiredCaptureId;
     }
 
@@ -2418,9 +3059,9 @@ public class ARBookGameShellController : MonoBehaviour
         int currentChapter = DetectActiveChapter();
         int completed = GetCompletedChapterCount();
         string current = currentChapter > 0
-            ? $"当前地图：{currentChapter} / 5"
-            : "当前地图：未识别";
-        return $"{current}\n已探索地图：{completed} / 5\n相机翻书后，常驻任务栏会自动更新。";
+            ? $"褰撳墠鍦板浘锛歿currentChapter} / 5"
+            : "褰撳墠鍦板浘锛氭湭璇嗗埆";
+        return $"{current}\n宸叉帰绱㈠湴鍥撅細{completed} / 5\n鐩告満缈讳功鍚庯紝甯搁┗浠诲姟鏍忎細鑷姩鏇存柊銆?;
     }
 
 #endif
@@ -2696,10 +3337,10 @@ public class ARBookGameShellController : MonoBehaviour
     {
         if (capturedIds == null || capturedIds.Count == 0)
         {
-            return "No captured creatures.";
+            return "暂无已收服精灵。";
         }
 
-        string text = "Captured:\n";
+        string text = "已收服列表：\n";
         for (int i = 0; i < capturedIds.Count; i++)
         {
             CompanionDefinition definition = FindCompanion(capturedIds[i]);
@@ -2714,10 +3355,10 @@ public class ARBookGameShellController : MonoBehaviour
     {
         if (capturedIds == null || capturedIds.Count == 0)
         {
-            return "暂无已收服精灵。";
+            return "鏆傛棤宸叉敹鏈嶇簿鐏点€?;
         }
 
-        string text = "已收服列表：\n";
+        string text = "宸叉敹鏈嶅垪琛細\n";
         for (int i = 0; i < capturedIds.Count; i++)
         {
             CompanionDefinition definition = FindCompanion(capturedIds[i]);
@@ -2771,6 +3412,9 @@ public class ARBookGameShellController : MonoBehaviour
 
     private void ClearCompanionState()
     {
+        PlayerPrefs.DeleteKey(CompanionInteractionCountKey);
+        ARBookCompanionBattleRoster.Clear();
+
         if (companions == null)
         {
             return;
@@ -2963,6 +3607,27 @@ public class ARBookGameShellController : MonoBehaviour
         background.color = new Color(0.18f, 0.21f, 0.28f, 1f);
         background.raycastTarget = false;
 
+        Texture2D portraitTexture = ResolveCompanionPortraitTexture(definition);
+        if (portraitTexture != null)
+        {
+            RectTransform imageRect = CreateRect("PortraitTexture", rect);
+            Stretch(imageRect, 4f, 4f, 4f, 4f);
+            RawImage rawImage = imageRect.gameObject.AddComponent<RawImage>();
+            rawImage.texture = portraitTexture;
+            rawImage.color = Color.white;
+            rawImage.uvRect = new Rect(0f, 0f, 1f, 1f);
+            rawImage.raycastTarget = false;
+            AspectRatioFitter fitter =
+                imageRect.gameObject.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fitter.aspectRatio = portraitTexture.height > 0
+                ? (float)portraitTexture.width / portraitTexture.height
+                : 1f;
+            imageRect.SetAsLastSibling();
+            rect.SetAsLastSibling();
+            return rect;
+        }
+
         if (definition != null && definition.portrait != null)
         {
             RectTransform imageRect = CreateRect("PortraitSprite", rect);
@@ -2970,25 +3635,82 @@ public class ARBookGameShellController : MonoBehaviour
             UIImage image = imageRect.gameObject.AddComponent<UIImage>();
             image.sprite = definition.portrait;
             image.preserveAspect = true;
+            image.color = Color.white;
             image.raycastTarget = false;
+            AspectRatioFitter fitter =
+                imageRect.gameObject.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fitter.aspectRatio = definition.portrait.rect.height > 0f
+                ? definition.portrait.rect.width / definition.portrait.rect.height
+                : 1f;
+            imageRect.SetAsLastSibling();
+            rect.SetAsLastSibling();
             return rect;
         }
 
-        if (definition != null && definition.portraitTexture != null)
-        {
-            RectTransform imageRect = CreateRect("PortraitTexture", rect);
-            Stretch(imageRect, 0f, 0f, 0f, 0f);
-            RawImage rawImage = imageRect.gameObject.AddComponent<RawImage>();
-            rawImage.texture = definition.portraitTexture;
-            rawImage.color = Color.white;
-            rawImage.raycastTarget = false;
-            return rect;
-        }
-
-        Debug.LogWarning(
-            $"Companion portrait is not assigned for {definition?.captureId}.",
-            this);
+        TMP_Text missing = CreateText(
+            "MissingPortrait",
+            rect,
+            "未绑定图片",
+            16,
+            FontStyles.Normal,
+            TextAlignmentOptions.Center);
+        Stretch(missing.rectTransform, 6f, 6f, 6f, 6f);
         return rect;
+    }
+
+    private static Texture2D ResolveCompanionPortraitTexture(
+        CompanionDefinition definition)
+    {
+        if (definition == null)
+        {
+            return null;
+        }
+
+        if (definition.portraitTexture != null)
+        {
+            return definition.portraitTexture;
+        }
+
+#if UNITY_EDITOR
+        string[] keys =
+        {
+            definition.imageTargetName,
+            definition.captureId,
+            definition.displayName,
+            GetCompanionTargetName(definition)
+        };
+        const string textureFolder =
+            "Assets/Editor/Vuforia/ImageTargetTextures/mcfAR";
+        string[] guids = AssetDatabase.FindAssets(
+            "t:Texture2D",
+            new[] { textureFolder });
+        for (int keyIndex = 0; keyIndex < keys.Length; keyIndex++)
+        {
+            string normalizedKey = NormalizeCompanionAssetName(keys[keyIndex]);
+            if (string.IsNullOrWhiteSpace(normalizedKey))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                string name = System.IO.Path.GetFileNameWithoutExtension(path);
+                if (!string.Equals(
+                    NormalizeCompanionAssetName(name),
+                    normalizedKey,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            }
+        }
+#endif
+
+        return null;
     }
 
     private static void DisableChildRaycasts(RectTransform root, Graphic except)

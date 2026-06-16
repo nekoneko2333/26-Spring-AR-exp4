@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEditor;
 using UnityEditor.Events;
@@ -103,9 +103,8 @@ public static class ARBookGameShellSetup
 
         if (controller.companions == null || controller.companions.Length == 0)
         {
-            Undo.RecordObject(controller, "Reset Companion Catalog");
-            controller.ResetCatalogToDefault();
-            changed++;
+            Debug.LogWarning(
+                "ARBookGameShellController companions is empty. Not auto-resetting it to avoid overwriting manual prefab/image bindings.");
         }
 
         return changed;
@@ -155,12 +154,12 @@ public static class ARBookGameShellSetup
             ? generatedRoot
             : searchRoot;
 
-        changed += SetObject(controller, controller.homeRoot, FindRect(root, "Home"), value => controller.homeRoot = value);
-        changed += SetObject(controller, controller.hudRoot, FindRect(root, "HUD"), value => controller.hudRoot = value);
-        changed += SetObject(controller, controller.companionRoot, FindRect(root, "CompanionMode"), value => controller.companionRoot = value);
-        changed += SetObject(controller, controller.backpackRoot, FindRect(root, "Backpack"), value => controller.backpackRoot = value);
-        changed += SetObject(controller, controller.dialogueRoot, FindRect(root, "DialoguePanel", "DialogueCanvas", "DialogueBox"), value => controller.dialogueRoot = value);
-        changed += SetObject(controller, controller.battleRoot, FindRect(root, "BattlePanel", "BattleCanvas", "BattleControls"), value => controller.battleRoot = value);
+        changed += SetObject(controller, controller.homeRoot, FindRectAny(root, "Home"), value => controller.homeRoot = value);
+        changed += SetObject(controller, controller.hudRoot, FindRectAny(root, "HUD"), value => controller.hudRoot = value);
+        changed += SetObject(controller, controller.companionRoot, FindRectAny(root, "CompanionMode"), value => controller.companionRoot = value);
+        changed += SetObject(controller, controller.backpackRoot, FindRectAny(root, "Backpack"), value => controller.backpackRoot = value);
+        changed += SetObject(controller, controller.dialogueRoot, FindRectAny(root, "DialoguePanel", "DialogueCanvas", "DialogueBox"), value => controller.dialogueRoot = value);
+        changed += SetObject(controller, controller.battleRoot, FindRectAny(root, "BattlePanel", "BattleCanvas", "BattleControls"), value => controller.battleRoot = value);
 
         changed += SetObject(controller, controller.companionGrid, FindRect(controller.companionRoot, "CompanionGrid"), value => controller.companionGrid = value);
         changed += SetObject(controller, controller.startButton, FindButton(controller.homeRoot, "StartButton"), value => controller.startButton = value);
@@ -170,9 +169,16 @@ public static class ARBookGameShellSetup
         changed += SetObject(controller, controller.hudCompanionButton, FindButton(controller.hudRoot, "CompanionButton", "HUDCompanionButton"), value => controller.hudCompanionButton = value);
         changed += SetObject(controller, controller.homeButton, FindButton(controller.hudRoot, "HomeButton"), value => controller.homeButton = value);
         changed += SetObject(controller, controller.placeButton, FindButton(controller.companionRoot, "PlaceButton"), value => controller.placeButton = value);
+        changed += SetButtonLabel(controller.placeButton, "携带");
         changed += SetObject(controller, controller.affectionButton, FindButton(controller.companionRoot, "AffectionButton", "InteractButton"), value => controller.affectionButton = value);
+        changed += SetButtonLabel(controller.affectionButton, "陪伴");
         changed += SetObject(controller, controller.clearCompanionsButton, FindButton(controller.companionRoot, "ClearButton", "ClearCompanionsButton"), value => controller.clearCompanionsButton = value);
+        if (controller.clearCompanionsButton != null)
+        {
+            SetInactive(controller.clearCompanionsButton.gameObject, ref changed);
+        }
         changed += SetObject(controller, controller.closeCompanionButton, FindButton(controller.companionRoot, "CloseButton", "CloseCompanionButton"), value => controller.closeCompanionButton = value);
+        changed += SetButtonLabel(controller.closeCompanionButton, "返回");
         changed += SetObject(controller, controller.closeBackpackButton, FindButton(controller.backpackRoot, "CloseButton", "CloseBackpackButton"), value => controller.closeBackpackButton = value);
         changed += SetObject(controller, controller.dialogueContinueButton, FindButton(controller.dialogueRoot, "ContinueButton", "NextButton"), value => controller.dialogueContinueButton = value);
         changed += SetObject(controller, controller.battleAttackButton, FindButton(controller.battleRoot, "AttackButton"), value => controller.battleAttackButton = value);
@@ -189,6 +195,16 @@ public static class ARBookGameShellSetup
         changed += SetObject(controller, controller.dialogueSpeakerText, FindText(controller.dialogueRoot, "SpeakerNameText", "SpeakerName"), value => controller.dialogueSpeakerText = value);
         changed += SetObject(controller, controller.dialogueBodyText, FindText(controller.dialogueRoot, "DialogueText"), value => controller.dialogueBodyText = value);
         changed += SetObject(controller, controller.battleMessageText, FindText(controller.battleRoot, "BattleMessageText", "MessageText"), value => controller.battleMessageText = value);
+        if (controller.battleMessageText == null && controller.battleRoot != null)
+        {
+            TMP_Text messageText = EnsureText(
+                controller.battleRoot,
+                "BattleMessageText",
+                "选择行动",
+                new Vector2(0f, -130f),
+                new Vector2(420f, 60f));
+            changed += SetObject(controller, controller.battleMessageText, messageText, value => controller.battleMessageText = value);
+        }
         changed += SetObject(controller, controller.battleLeftHPText, FindText(controller.battleRoot, "LeftHPText", "EnemyHPText"), value => controller.battleLeftHPText = value);
         changed += SetObject(controller, controller.battleRightHPText, FindText(controller.battleRoot, "RightHPText", "PlayerHPText"), value => controller.battleRightHPText = value);
 
@@ -197,6 +213,41 @@ public static class ARBookGameShellSetup
         changed += SetObject(controller, controller.dialogueRightHighlight, FindNamedChild<Image>(controller.dialogueRoot, "RightSpeakerHighlight"), value => controller.dialogueRightHighlight = value);
         changed += SetObject(controller, controller.battleLeftHPSlider, FindNamedChild<Slider>(controller.battleRoot, "LeftHPSlider", "EnemyHPSlider"), value => controller.battleLeftHPSlider = value);
         changed += SetObject(controller, controller.battleRightHPSlider, FindNamedChild<Slider>(controller.battleRoot, "RightHPSlider", "PlayerHPSlider"), value => controller.battleRightHPSlider = value);
+
+        if (controller.hudRoot != null)
+        {
+            TMP_Text companionStatus = EnsureText(
+                controller.hudRoot,
+                "CompanionCameraStatusText",
+                "心情",
+                new Vector2(0f, -52f),
+                new Vector2(520f, 46f));
+            Image moodFill = EnsureImage(
+                controller.hudRoot,
+                "CompanionMoodFill",
+                new Vector2(0f, -88f),
+                new Vector2(520f, 24f));
+            Button returnGame = EnsureButton(
+                controller.hudRoot,
+                "CompanionReturnGameButton",
+                "返回游戏",
+                new Vector2(-250f, 58f));
+            Button companionInteract = EnsureButton(
+                controller.hudRoot,
+                "CompanionInteractButton",
+                "互动",
+                new Vector2(0f, 58f));
+            Button returnHome = EnsureButton(
+                controller.hudRoot,
+                "CompanionReturnHomeButton",
+                "返回首页",
+                new Vector2(250f, 58f));
+            changed += SetObject(controller, controller.companionCameraInteractButton, companionInteract, value => controller.companionCameraInteractButton = value);
+            changed += SetObject(controller, controller.companionCameraStatusText, companionStatus, value => controller.companionCameraStatusText = value);
+            changed += SetObject(controller, controller.companionMoodFill, moodFill, value => controller.companionMoodFill = value);
+            changed += SetObject(controller, controller.companionReturnGameButton, returnGame, value => controller.companionReturnGameButton = value);
+            changed += SetObject(controller, controller.companionReturnHomeButton, returnHome, value => controller.companionReturnHomeButton = value);
+        }
 
         return changed;
     }
@@ -314,11 +365,32 @@ public static class ARBookGameShellSetup
         }
 
         Undo.RecordObject(battle, "Bind Battle UI");
-        battle.battleControlsRoot = controller.battleRoot.gameObject;
+        Transform battleControls = FindNamedChild(
+            controller.battleRoot,
+            "BattleControls") ?? controller.battleRoot;
+        battle.battleControlsRoot = battleControls.gameObject;
         battle.messageText = controller.battleMessageText;
+        battle.battleAttackButton = controller.battleAttackButton;
+        battle.battleExitButton = controller.battleExitButton;
+        battle.companionAButton = EnsureButton(
+            battleControls,
+            "CompanionAButton",
+            "A 宝可梦攻击",
+            new Vector2(-210f, 38f));
+        battle.companionBButton = EnsureButton(
+            battleControls,
+            "CompanionBButton",
+            "B 宝可梦攻击",
+            new Vector2(-210f, -38f));
+        battle.companionAButtonText = battle.companionAButton != null
+            ? battle.companionAButton.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        battle.companionBButtonText = battle.companionBButton != null
+            ? battle.companionBButton.GetComponentInChildren<TMP_Text>(true)
+            : null;
         controller.battleRoot.gameObject.SetActive(false);
         EditorUtility.SetDirty(battle);
-        changed += 3;
+        changed += 7;
 
         changed += EnsurePersistentListener(
             controller.battleAttackButton,
@@ -330,23 +402,67 @@ public static class ARBookGameShellSetup
             battle,
             "ExitBattle",
             battle.ExitBattle);
+        changed += EnsurePersistentListener(
+            battle.companionAButton,
+            battle,
+            "CompanionAAttack",
+            battle.CompanionAAttack);
+        changed += EnsurePersistentListener(
+            battle.companionBButton,
+            battle,
+            "CompanionBAttack",
+            battle.CompanionBAttack);
 
         if (battle.enemy != null)
         {
+            bool enemyChanged = false;
             Undo.RecordObject(battle.enemy, "Bind Enemy Battle HUD");
-            battle.enemy.hpSlider = controller.battleLeftHPSlider;
-            battle.enemy.hpText = controller.battleLeftHPText;
-            EditorUtility.SetDirty(battle.enemy);
-            changed += 2;
+            if (controller.battleLeftHPSlider != null &&
+                battle.enemy.hpSlider != controller.battleLeftHPSlider)
+            {
+                battle.enemy.hpSlider = controller.battleLeftHPSlider;
+                enemyChanged = true;
+                changed++;
+            }
+
+            if (controller.battleLeftHPText != null &&
+                battle.enemy.hpText != controller.battleLeftHPText)
+            {
+                battle.enemy.hpText = controller.battleLeftHPText;
+                enemyChanged = true;
+                changed++;
+            }
+
+            if (enemyChanged)
+            {
+                EditorUtility.SetDirty(battle.enemy);
+            }
         }
 
         if (battle.player != null)
         {
+            bool playerChanged = false;
             Undo.RecordObject(battle.player, "Bind Player Battle HUD");
-            battle.player.hpSlider = controller.battleRightHPSlider;
-            battle.player.hpText = controller.battleRightHPText;
-            EditorUtility.SetDirty(battle.player);
-            changed += 2;
+            if (controller.battleRightHPSlider != null &&
+                battle.player.hpSlider != controller.battleRightHPSlider)
+            {
+                battle.player.hpSlider = controller.battleRightHPSlider;
+                playerChanged = true;
+                changed++;
+            }
+
+            if (controller.battleRightHPText != null &&
+                battle.player.hpText != controller.battleRightHPText)
+            {
+                battle.player.hpText = controller.battleRightHPText;
+                playerChanged = true;
+                changed++;
+            }
+
+            if (playerChanged)
+            {
+                EditorUtility.SetDirty(battle.player);
+            }
         }
 
         return changed;
@@ -455,6 +571,165 @@ public static class ARBookGameShellSetup
         return 1;
     }
 
+    private static int SetButtonLabel(Button button, string label)
+    {
+        if (button == null)
+        {
+            return 0;
+        }
+
+        TMP_Text text = button.GetComponentInChildren<TMP_Text>(true);
+        if (text == null || text.text == label)
+        {
+            return 0;
+        }
+
+        Undo.RecordObject(text, "Set Button Label");
+        text.text = label;
+        EditorUtility.SetDirty(text);
+        return 1;
+    }
+
+    private static Button EnsureButton(
+        Transform parent,
+        string name,
+        string label,
+        Vector2 anchoredPosition)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Button existing = FindButton(parent, name);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject buttonObject = new GameObject(
+            name,
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(Button));
+        Undo.RegisterCreatedObjectUndo(buttonObject, $"Create {name}");
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(260f, 64f);
+        rect.anchoredPosition = anchoredPosition;
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.raycastTarget = true;
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        GameObject textObject = new GameObject(
+            "Text",
+            typeof(RectTransform),
+            typeof(TextMeshProUGUI));
+        Undo.RegisterCreatedObjectUndo(textObject, $"Create {name} Text");
+        textObject.transform.SetParent(buttonObject.transform, false);
+
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(8f, 6f);
+        textRect.offsetMax = new Vector2(-8f, -6f);
+
+        TMP_Text text = textObject.GetComponent<TMP_Text>();
+        text.text = label;
+        text.fontSize = 22f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.black;
+        text.raycastTarget = false;
+
+        EditorUtility.SetDirty(buttonObject);
+        return button;
+    }
+
+    private static TMP_Text EnsureText(
+        Transform parent,
+        string name,
+        string textValue,
+        Vector2 anchoredPosition,
+        Vector2 size)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        TMP_Text existing = FindText(parent, name);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject textObject = new GameObject(
+            name,
+            typeof(RectTransform),
+            typeof(TextMeshProUGUI));
+        Undo.RegisterCreatedObjectUndo(textObject, $"Create {name}");
+        textObject.transform.SetParent(parent, false);
+
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = anchoredPosition;
+
+        TMP_Text text = textObject.GetComponent<TMP_Text>();
+        text.text = textValue;
+        text.fontSize = 26f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.black;
+        text.raycastTarget = false;
+
+        EditorUtility.SetDirty(textObject);
+        return text;
+    }
+
+    private static Image EnsureImage(
+        Transform parent,
+        string name,
+        Vector2 anchoredPosition,
+        Vector2 size)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Image existing = FindNamedChild<Image>(parent, name);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject imageObject = new GameObject(
+            name,
+            typeof(RectTransform),
+            typeof(Image));
+        Undo.RegisterCreatedObjectUndo(imageObject, $"Create {name}");
+        imageObject.transform.SetParent(parent, false);
+
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = anchoredPosition;
+
+        Image image = imageObject.GetComponent<Image>();
+        image.raycastTarget = false;
+
+        EditorUtility.SetDirty(imageObject);
+        return image;
+    }
+
     private static int SetObject<T>(
         Object undoTarget,
         T current,
@@ -546,6 +821,17 @@ public static class ARBookGameShellSetup
         return FindNamedChild<RectTransform>(root, names);
     }
 
+    private static RectTransform FindRectAny(Transform root, params string[] names)
+    {
+        RectTransform rect = FindRect(root, names);
+        if (rect != null)
+        {
+            return rect;
+        }
+
+        return FindNamedComponent<RectTransform>(names);
+    }
+
     private static Button FindButton(Transform root, params string[] names)
     {
         return FindNamedChild<Button>(root, names);
@@ -623,3 +909,4 @@ public static class ARBookGameShellSetup
         return null;
     }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -22,8 +22,11 @@ public class ARBookPresentationDirector : MonoBehaviour
     [Min(0.1f)] public float battleOpponentHeight = 1.35f;
     [Min(0.1f)] public float battlePlayerHeight = 4.2f;
     [Min(0.1f)] public float battleAssistHeight = 1.25f;
+    [Range(0.1f, 0.8f)] public float battleAssistMaxViewportHeight = 0.32f;
+    [Range(0.1f, 0.8f)] public float battleAssistMaxViewportWidth = 0.22f;
     public Vector3 battleAssistLocalOffsetA = new Vector3(0.9f, 0f, 0.15f);
     public Vector3 battleAssistLocalOffsetB = new Vector3(1.55f, 0f, 0.3f);
+    public float battleAssistYawCorrection = 180f;
     [Min(0.1f)] public float dialogueActorHeight = 3.6f;
     [Min(0.1f)] public float capturableDialogueActorHeight = 4.8f;
     [Min(0.1f)] public float dialoguePlayerHeight = 4.4f;
@@ -49,7 +52,7 @@ public class ARBookPresentationDirector : MonoBehaviour
         if (Instance != null && Instance != this)
         {
             Debug.LogWarning(
-                "场景中存在多个 ARBookPresentationDirector。",
+                "场景中存在多个 ARBookPresentationDirector，将使用最新启用的实例。",
                 this);
         }
 
@@ -218,6 +221,7 @@ public class ARBookPresentationDirector : MonoBehaviour
         battleController.enemy.displayName = interactable.GetDisplayName();
         battleController.player.actor = playerActor;
         battleController.player.displayName = "训练家";
+        battleController.SetBattleParty(ARBookCompanionBattleRoster.GetParty());
 
         ARBookPlayerPower playerPower = ARBookPlayerPower.Resolve();
         if (playerPower != null)
@@ -231,10 +235,19 @@ public class ARBookPresentationDirector : MonoBehaviour
         {
             battleStats.ApplyToEnemy(battleController.enemy);
         }
+        else if (string.Equals(
+            interactable.captureId,
+            "Zekrom",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            battleController.enemy.maxHP = 320;
+            battleController.enemy.attackPower = 35;
+        }
 
         battleController.cameraRig?.SetIntroTarget(
             battlePlayerClone.transform);
         battleController.SetIntroOpponent(battleOpponentClone);
+        CreateBattleAssistClones();
         battleController.cameraRig?.SnapToEnd();
         ApplyBattleFacing(
             battleOpponentClone,
@@ -362,6 +375,133 @@ public class ARBookPresentationDirector : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void CreateBattleAssistClones()
+    {
+        ClearBattleAssistClones();
+        if (battlePlayerAnchor == null)
+        {
+            return;
+        }
+
+        string[] party = ARBookCompanionBattleRoster.GetParty();
+        Vector3[] offsets =
+        {
+            battleAssistLocalOffsetA,
+            battleAssistLocalOffsetB
+        };
+
+        for (int i = 0; i < party.Length && i < offsets.Length; i++)
+        {
+            string captureId = party[i];
+            if (string.IsNullOrWhiteSpace(captureId) ||
+                !ARBookCompanionBattleRoster.CanBattle(captureId))
+            {
+                continue;
+            }
+
+            GameObject source = ResolveSinglePokemonModelById(captureId);
+            if (source == null)
+            {
+                continue;
+            }
+
+            GameObject clone = CreatePresentationClone(
+                source,
+                battlePlayerAnchor,
+                battleAssistHeight,
+                $"BattleAssist_{captureId}",
+                battleController?.session?.presentationCamera);
+            if (clone == null)
+            {
+                continue;
+            }
+
+            clone.transform.localPosition = offsets[i];
+            ApplyBattleFacing(
+                clone,
+                battleController?.session?.presentationCamera,
+                battleAssistYawCorrection);
+            FitModelInCameraView(
+                clone,
+                battleController?.session?.presentationCamera,
+                battleAssistMaxViewportWidth,
+                battleAssistMaxViewportHeight);
+            battleAssistClones.Add(clone);
+        }
+    }
+
+    private static GameObject ResolveSinglePokemonModelById(string captureId)
+    {
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return null;
+        }
+
+        string targetName = ResolveDefaultImageTargetName(captureId);
+        Vuforia.ObserverBehaviour[] observers =
+            FindObjectsOfType<Vuforia.ObserverBehaviour>(true);
+        for (int i = 0; i < observers.Length; i++)
+        {
+            Vuforia.ObserverBehaviour observer = observers[i];
+            if (observer == null ||
+                !string.Equals(
+                    NormalizeAssetName(observer.TargetName),
+                    NormalizeAssetName(targetName),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            for (int childIndex = 0;
+                 childIndex < observer.transform.childCount;
+                 childIndex++)
+            {
+                Transform child = observer.transform.GetChild(childIndex);
+                if (child.GetComponentInChildren<Renderer>(true) != null)
+                {
+                    return child.gameObject;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string ResolveDefaultImageTargetName(string captureId)
+    {
+        if (string.Equals(captureId, "ElectrodeHisuian", StringComparison.OrdinalIgnoreCase))
+        {
+            return "electrode";
+        }
+
+        if (string.Equals(captureId, "Talonflame", StringComparison.OrdinalIgnoreCase))
+        {
+            return "GalarianZapdos";
+        }
+
+        return captureId;
+    }
+
+    private static string NormalizeAssetName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        string normalized = value.Trim();
+        const string scaledSuffix = "_scaled";
+        if (normalized.EndsWith(scaledSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized.Substring(0, normalized.Length - scaledSuffix.Length);
+        }
+
+        return normalized
+            .Replace(" ", string.Empty)
+            .Replace("_", string.Empty)
+            .Replace("-", string.Empty);
     }
 
     private static GameObject CreatePresentationClone(
@@ -525,6 +665,88 @@ public class ARBookPresentationDirector : MonoBehaviour
         model.transform.rotation =
             Quaternion.LookRotation(direction.normalized, Vector3.up) *
             Quaternion.Euler(0f, yawCorrection, 0f);
+    }
+
+    private static void FitModelInCameraView(
+        GameObject model,
+        Camera camera,
+        float maxViewportWidth,
+        float maxViewportHeight)
+    {
+        if (model == null || camera == null)
+        {
+            return;
+        }
+
+        if (!TryGetViewportRect(model, camera, out Rect rect))
+        {
+            return;
+        }
+
+        float widthScale = rect.width > 0.0001f
+            ? Mathf.Clamp01(maxViewportWidth / rect.width)
+            : 1f;
+        float heightScale = rect.height > 0.0001f
+            ? Mathf.Clamp01(maxViewportHeight / rect.height)
+            : 1f;
+        float scale = Mathf.Min(widthScale, heightScale);
+        if (scale < 0.999f)
+        {
+            model.transform.localScale *= scale;
+        }
+    }
+
+    private static bool TryGetViewportRect(
+        GameObject model,
+        Camera camera,
+        out Rect rect)
+    {
+        rect = Rect.zero;
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            return false;
+        }
+
+        bool hasPoint = false;
+        Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Bounds bounds = renderers[i].bounds;
+            Vector3 center = bounds.center;
+            Vector3 extents = bounds.extents;
+            for (int x = -1; x <= 1; x += 2)
+            {
+                for (int y = -1; y <= 1; y += 2)
+                {
+                    for (int z = -1; z <= 1; z += 2)
+                    {
+                        Vector3 point = center + Vector3.Scale(
+                            extents,
+                            new Vector3(x, y, z));
+                        Vector3 viewport = camera.WorldToViewportPoint(point);
+                        if (viewport.z <= 0f)
+                        {
+                            continue;
+                        }
+
+                        min = Vector2.Min(min, viewport);
+                        max = Vector2.Max(max, viewport);
+                        hasPoint = true;
+                    }
+                }
+            }
+        }
+
+        if (!hasPoint)
+        {
+            return false;
+        }
+
+        rect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        return true;
     }
 
     private static Texture ResolveMainTexture(Material material)
@@ -741,8 +963,22 @@ public class ARBookPresentationDirector : MonoBehaviour
 
     private void CleanupBattleModels()
     {
+        ClearBattleAssistClones();
         DestroyClone(ref battleOpponentClone);
         DestroyClone(ref battlePlayerClone);
+    }
+
+    private void ClearBattleAssistClones()
+    {
+        for (int i = 0; i < battleAssistClones.Count; i++)
+        {
+            if (battleAssistClones[i] != null)
+            {
+                Destroy(battleAssistClones[i]);
+            }
+        }
+
+        battleAssistClones.Clear();
     }
 
     private void CleanupDialogueModels()
@@ -793,3 +1029,4 @@ public class ARBookPresentationDirector : MonoBehaviour
         }
     }
 }
+

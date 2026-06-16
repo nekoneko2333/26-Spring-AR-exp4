@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -25,7 +25,7 @@ public class ARBookInteractable : MonoBehaviour
     public GameObject presentationModelRoot;
     [Tooltip("可选。对话或战斗副本使用的动画控制器。")]
     public RuntimeAnimatorController presentationAnimatorController;
-    [Tooltip("战斗演出中保持模型当前待机，不切换其他战斗动画。")]
+    [Tooltip("战斗演出中保持模型当前待机，不切换其它战斗动画。")]
     public bool keepBattleIdle;
 
     private int dialogueIndex;
@@ -83,7 +83,7 @@ public class ARBookInteractable : MonoBehaviour
 
         if (dialogueManager == null)
         {
-            Debug.LogWarning($"No DialogueManager found for interactable: {GetDisplayName()}");
+            Debug.LogWarning($"没有找到 DialogueManager：{GetDisplayName()}");
             return;
         }
 
@@ -96,22 +96,40 @@ public class ARBookInteractable : MonoBehaviour
     {
         if (dialogueFragments == null || dialogueFragments.Length == 0)
         {
-            return new[] { string.IsNullOrWhiteSpace(captureDialogue) ? string.Empty : captureDialogue };
+            return new[]
+            {
+                string.IsNullOrWhiteSpace(captureDialogue)
+                    ? $"{GetDisplayName()}看向你，似乎正在等待你的回应。"
+                    : captureDialogue
+            };
         }
 
         if (!cycleDialogue)
         {
-            return dialogueFragments;
+            return SanitizeDialogue(dialogueFragments);
         }
 
         string dialogue = dialogueFragments[Mathf.Clamp(dialogueIndex, 0, dialogueFragments.Length - 1)];
-        
-        if (cycleDialogue)
+        if (string.IsNullOrWhiteSpace(dialogue))
         {
-            dialogueIndex = (dialogueIndex + 1) % dialogueFragments.Length;
+            dialogue = $"{GetDisplayName()}轻轻点头，像是在回应你。";
         }
 
+        dialogueIndex = (dialogueIndex + 1) % dialogueFragments.Length;
         return new[] { dialogue };
+    }
+
+    private string[] SanitizeDialogue(string[] source)
+    {
+        string[] result = new string[source.Length];
+        for (int i = 0; i < source.Length; i++)
+        {
+            result[i] = string.IsNullOrWhiteSpace(source[i])
+                ? $"{GetDisplayName()}沉默了一会儿，然后向你点头。"
+                : source[i];
+        }
+
+        return result;
     }
 
     private void FaceCamera()
@@ -119,7 +137,7 @@ public class ARBookInteractable : MonoBehaviour
         Camera mainCamera = Camera.main;
         if (mainCamera == null)
         {
-            Debug.LogWarning("ARBookInteractable could not find Camera.main.");
+            Debug.LogWarning("ARBookInteractable 找不到 Camera.main。");
             return;
         }
 
@@ -137,5 +155,4 @@ public class ARBookInteractable : MonoBehaviour
     {
         return string.IsNullOrWhiteSpace(displayName) ? gameObject.name : displayName;
     }
-
 }
