@@ -219,8 +219,10 @@ public class ARBookPresentationDirector : MonoBehaviour
 
         battleController.enemy.actor = opponentActor;
         battleController.enemy.displayName = interactable.GetDisplayName();
+        battleController.enemy.audioEnabled = false;
         battleController.player.actor = playerActor;
         battleController.player.displayName = "训练家";
+        battleController.player.audioEnabled = true;
         battleController.SetBattleParty(ARBookCompanionBattleRoster.GetParty());
 
         ARBookPlayerPower playerPower = ARBookPlayerPower.Resolve();
@@ -235,13 +237,13 @@ public class ARBookPresentationDirector : MonoBehaviour
         {
             battleStats.ApplyToEnemy(battleController.enemy);
         }
-        else if (string.Equals(
+        else if (TryGetDefaultEnemyStats(
             interactable.captureId,
-            "Zekrom",
-            StringComparison.OrdinalIgnoreCase))
+            out int enemyMaxHP,
+            out int enemyAttackPower))
         {
-            battleController.enemy.maxHP = 320;
-            battleController.enemy.attackPower = 35;
+            battleController.enemy.maxHP = enemyMaxHP;
+            battleController.enemy.attackPower = enemyAttackPower;
         }
 
         battleController.cameraRig?.SetIntroTarget(
@@ -295,6 +297,44 @@ public class ARBookPresentationDirector : MonoBehaviour
         {
             RestoreActivePlayerControl();
         }
+    }
+
+    private static bool TryGetDefaultEnemyStats(
+        string captureId,
+        out int maxHP,
+        out int attackPower)
+    {
+        maxHP = 120;
+        attackPower = 18;
+
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return false;
+        }
+
+        if (string.Equals(captureId, "Zekrom", StringComparison.OrdinalIgnoreCase))
+        {
+            maxHP = 320;
+            attackPower = 36;
+            return true;
+        }
+
+        if (string.Equals(captureId, "Zygarde", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(captureId, "Zygarde10", StringComparison.OrdinalIgnoreCase))
+        {
+            maxHP = 300;
+            attackPower = 34;
+            return true;
+        }
+
+        if (string.Equals(captureId, "Toxtricity", StringComparison.OrdinalIgnoreCase))
+        {
+            maxHP = 260;
+            attackPower = 30;
+            return true;
+        }
+
+        return false;
     }
 
     private void HandleDialogueCompleted()

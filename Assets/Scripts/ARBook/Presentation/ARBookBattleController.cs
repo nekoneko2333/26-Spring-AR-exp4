@@ -21,6 +21,8 @@ public class ARBookBattleController : MonoBehaviour
     public Button companionBButton;
     public TMP_Text companionAButtonText;
     public TMP_Text companionBButtonText;
+    public ARBookAudioCue defaultBgmCue;
+    public ARBookAudioCue battleBgmCue;
 
     [Header("Timing")]
     [Min(0f)] public float introDuration = 2.5f;
@@ -95,6 +97,7 @@ public class ARBookBattleController : MonoBehaviour
         HideBattleUi();
 
         session?.Exit();
+        RestoreDefaultBgm();
         BattleFinished?.Invoke(false);
         onBattleExited?.Invoke();
     }
@@ -110,6 +113,7 @@ public class ARBookBattleController : MonoBehaviour
             yield return session.Enter();
         }
 
+        PlayBattleBgm();
         ShowBattleUi(false);
 
         player?.ResetCombatant();
@@ -279,8 +283,53 @@ public class ARBookBattleController : MonoBehaviour
         HideBattleUi();
 
         session?.Exit();
+        RestoreDefaultBgm();
         BattleFinished?.Invoke(playerWon);
         onBattleExited?.Invoke();
+    }
+
+    private void PlayBattleBgm()
+    {
+        ResolveAudioCues();
+        defaultBgmCue?.Stop();
+        battleBgmCue?.Play();
+    }
+
+    private void RestoreDefaultBgm()
+    {
+        ResolveAudioCues();
+        battleBgmCue?.Stop();
+        defaultBgmCue?.Play();
+    }
+
+    private void ResolveAudioCues()
+    {
+        if (defaultBgmCue != null && battleBgmCue != null)
+        {
+            return;
+        }
+
+        GameObject root = GameObject.Find("ARBookAudio");
+        if (root == null)
+        {
+            return;
+        }
+
+        if (defaultBgmCue == null)
+        {
+            Transform defaultBgm = root.transform.Find("DefaultBGM");
+            defaultBgmCue = defaultBgm != null
+                ? defaultBgm.GetComponent<ARBookAudioCue>()
+                : null;
+        }
+
+        if (battleBgmCue == null)
+        {
+            Transform battleBgm = root.transform.Find("BattleBGM");
+            battleBgmCue = battleBgm != null
+                ? battleBgm.GetComponent<ARBookAudioCue>()
+                : null;
+        }
     }
 
     private void ShowBattleUi(bool showControls)

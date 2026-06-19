@@ -217,12 +217,28 @@ public static class ARBookAudioAutoBinder
         {
             ARBookBattleCombatant combatant = combatants[i];
             Undo.RecordObject(combatant, "Bind battle combatant audio");
-            changed += SetClip(combatant.attackClip, attack, value => combatant.attackClip = value);
-            changed += SetClip(combatant.hitClip, hit, value => combatant.hitClip = value);
-            changed += SetClip(combatant.defeatClip, defeat, value => combatant.defeatClip = value);
-            changed += SetClip(combatant.victoryClip, victory, value => combatant.victoryClip = value);
-            changed += SetClip(combatant.captureSuccessClip, victory, value => combatant.captureSuccessClip = value);
-            changed += EnsureAudioSource(combatant.gameObject, combatant.audioSource, value => combatant.audioSource = value);
+            bool isPlayer = combatant.name.Contains("Trainer") ||
+                            combatant.displayName.Contains("\u8BAD\u7EC3\u5BB6");
+            if (isPlayer)
+            {
+                changed += SetBool(combatant.audioEnabled, true, value => combatant.audioEnabled = value);
+                changed += SetClip(combatant.attackClip, attack, value => combatant.attackClip = value);
+                changed += SetClip(combatant.hitClip, hit, value => combatant.hitClip = value);
+                changed += SetClip(combatant.defeatClip, defeat, value => combatant.defeatClip = value);
+                changed += SetClip(combatant.victoryClip, victory, value => combatant.victoryClip = value);
+                changed += SetClip(combatant.captureSuccessClip, victory, value => combatant.captureSuccessClip = value);
+                changed += EnsureAudioSource(combatant.gameObject, combatant.audioSource, value => combatant.audioSource = value);
+            }
+            else
+            {
+                changed += SetBool(combatant.audioEnabled, false, value => combatant.audioEnabled = value);
+                changed += SetClip(combatant.attackClip, null, value => combatant.attackClip = value, true);
+                changed += SetClip(combatant.hitClip, null, value => combatant.hitClip = value, true);
+                changed += SetClip(combatant.defeatClip, null, value => combatant.defeatClip = value, true);
+                changed += SetClip(combatant.victoryClip, null, value => combatant.victoryClip = value, true);
+                changed += SetClip(combatant.captureSuccessClip, null, value => combatant.captureSuccessClip = value, true);
+            }
+
             EditorUtility.SetDirty(combatant);
         }
 
@@ -237,6 +253,8 @@ public static class ARBookAudioAutoBinder
         {
             ARBookBattleController battle = battles[i];
             Undo.RecordObject(battle, "Bind battle BGM events");
+            changed += SetCue(battle.defaultBgmCue, defaultBgmCue, value => battle.defaultBgmCue = value);
+            changed += SetCue(battle.battleBgmCue, battleBgmCue, value => battle.battleBgmCue = value);
             changed += AddPersistentListener(battle.onBattleStarted, defaultBgmCue, nameof(ARBookAudioCue.Stop));
             changed += AddPersistentListener(battle.onBattleStarted, battleBgmCue, nameof(ARBookAudioCue.Play));
             changed += AddPersistentListener(battle.onPlayerVictory, battleBgmCue, nameof(ARBookAudioCue.Stop));
@@ -386,9 +404,31 @@ public static class ARBookAudioAutoBinder
         return 1;
     }
 
-    private static int SetClip(AudioClip current, AudioClip target, System.Action<AudioClip> assign)
+    private static int SetClip(AudioClip current, AudioClip target, System.Action<AudioClip> assign, bool allowNull = false)
+    {
+        if ((!allowNull && target == null) || current == target)
+        {
+            return 0;
+        }
+
+        assign(target);
+        return 1;
+    }
+
+    private static int SetCue(ARBookAudioCue current, ARBookAudioCue target, System.Action<ARBookAudioCue> assign)
     {
         if (target == null || current == target)
+        {
+            return 0;
+        }
+
+        assign(target);
+        return 1;
+    }
+
+    private static int SetBool(bool current, bool target, System.Action<bool> assign)
+    {
+        if (current == target)
         {
             return 0;
         }

@@ -48,7 +48,7 @@ public class ARBookConditionalMover : MonoBehaviour
 
         if (autoMoveWhenConditionsMet)
         {
-            TryMove();
+            TryMove(false);
         }
     }
 
@@ -61,7 +61,7 @@ public class ARBookConditionalMover : MonoBehaviour
 
         if (autoMoveWhenConditionsMet)
         {
-            TryMove();
+            TryMove(false);
         }
 
         nextEvaluateTime = Time.time + Mathf.Max(0.1f, evaluateInterval);
@@ -69,6 +69,11 @@ public class ARBookConditionalMover : MonoBehaviour
 
     [ContextMenu("Try Move")]
     public void TryMove()
+    {
+        TryMove(true);
+    }
+
+    private void TryMove(bool notifyBlocked)
     {
         ResolveReferences();
 
@@ -85,7 +90,11 @@ public class ARBookConditionalMover : MonoBehaviour
         if (conditions != null &&
             !conditions.IsMet(collectionManager, chapterProgress))
         {
-            onMoveBlocked?.Invoke();
+            if (notifyBlocked)
+            {
+                onMoveBlocked?.Invoke();
+            }
+
             return;
         }
 

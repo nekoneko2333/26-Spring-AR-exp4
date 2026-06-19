@@ -11,6 +11,7 @@ public class ARBookBattleCombatant : MonoBehaviour
     public ARBookPresentationActor actor;
     public Slider hpSlider;
     public TMP_Text hpText;
+    public bool audioEnabled = true;
     public AudioSource audioSource;
     public AudioClip attackClip;
     public AudioClip hitClip;
@@ -94,7 +95,7 @@ public class ARBookBattleCombatant : MonoBehaviour
 
     private void PlayClip(AudioClip clip)
     {
-        if (clip == null)
+        if (!audioEnabled || clip == null)
         {
             return;
         }

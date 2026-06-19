@@ -601,6 +601,22 @@ public class ARBookGameShellController : MonoBehaviour
         RefreshCompanionDetail();
     }
 
+    public void SelectCompanionForPanel(string captureId)
+    {
+        selectedCompanionIds.Clear();
+        if (!string.IsNullOrWhiteSpace(captureId) && IsCaptured(captureId))
+        {
+            selectedCompanionIds.Add(captureId);
+        }
+
+        RefreshCompanionDetail();
+    }
+
+    public int GetCompanionInteractionsRemainingForUi()
+    {
+        return GetCompanionInteractionsRemaining();
+    }
+
     private static CompanionDefinition CreateCompanion(string captureId, string displayName)
     {
         return new CompanionDefinition
@@ -2181,7 +2197,9 @@ public class ARBookGameShellController : MonoBehaviour
             ARBookCompanionBattleRoster.IsInParty(captureId)
                 ? "已携带"
                 : "携带");
-        SetButtonText(affectionButton, "互动");
+        SetButtonText(
+            affectionButton,
+            $"互动（{GetCompanionInteractionsRemaining()}/{maxCompanionInteractionsPerGame}）");
         SetButtonText(clearCompanionsButton, "返回");
         SetButtonText(closeCompanionButton, "返回");
 
@@ -2192,13 +2210,17 @@ public class ARBookGameShellController : MonoBehaviour
 
         if (affectionButton != null)
         {
-            affectionButton.interactable = !string.IsNullOrWhiteSpace(captureId);
+            affectionButton.interactable =
+                !string.IsNullOrWhiteSpace(captureId) &&
+                GetCompanionInteractionsRemaining() > 0;
         }
 
         if (clearCompanionsButton != null)
         {
             clearCompanionsButton.gameObject.SetActive(false);
         }
+
+        RefreshCompanionInteractionButton();
     }
 
     private static void SetButtonText(Button button, string text)

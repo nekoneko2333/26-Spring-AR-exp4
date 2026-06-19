@@ -32,6 +32,8 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
     public Button nextButton;
     public Button carryButton;
     public TMP_Text carryButtonText;
+    public Button interactButton;
+    public TMP_Text interactButtonText;
 
     private readonly List<ARBookGameShellController.CompanionDefinition> captured =
         new List<ARBookGameShellController.CompanionDefinition>();
@@ -41,6 +43,7 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
     private void Awake()
     {
         ResolveController();
+        BindExistingUiByName();
         BindRuntimeButtons();
         Refresh();
     }
@@ -98,6 +101,15 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
             ? carryButtonText
             : carryButton != null
                 ? carryButton.GetComponentInChildren<TMP_Text>(true)
+                : null;
+        interactButton = interactButton != null
+            ? interactButton
+            : FindButton(detailRoot, "InteractButton", "AffectionButton", "CompanionInteractButton") ??
+              FindButton(actualRoot, "InteractButton", "AffectionButton", "CompanionInteractButton");
+        interactButtonText = interactButtonText != null
+            ? interactButtonText
+            : interactButton != null
+                ? interactButton.GetComponentInChildren<TMP_Text>(true)
                 : null;
 
         Transform slotSearchRoot = gridRoot != null ? gridRoot : actualRoot;
@@ -193,6 +205,12 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
         {
             carryButton.onClick.RemoveListener(ToggleCarrySelected);
             carryButton.onClick.AddListener(ToggleCarrySelected);
+        }
+
+        if (interactButton != null)
+        {
+            interactButton.onClick.RemoveListener(InteractWithSelected);
+            interactButton.onClick.AddListener(InteractWithSelected);
         }
     }
 
@@ -294,6 +312,7 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
         }
 
         selectedId = captured[capturedIndex].captureId;
+        controller.SelectCompanionForPanel(selectedId);
         RefreshDetail();
     }
 
@@ -305,6 +324,19 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
         }
 
         ARBookCompanionBattleRoster.TogglePartyMember(selectedId);
+        controller.SelectCompanionForPanel(selectedId);
+        RefreshDetail();
+    }
+
+    private void InteractWithSelected()
+    {
+        if (string.IsNullOrWhiteSpace(selectedId))
+        {
+            return;
+        }
+
+        controller.SelectCompanionForPanel(selectedId);
+        controller.AddAffectionToSelected();
         RefreshDetail();
     }
 
@@ -350,18 +382,24 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
                 carryButtonText.text = "\u643a\u5e26";
             }
 
+            RefreshInteractButton(false);
+
             return;
         }
 
         bool carried = ARBookCompanionBattleRoster.IsInParty(selected.captureId);
         string mood = ARBookCompanionBattleRoster.GetMood(selected.captureId).ToString();
         int affection = PlayerPrefs.GetInt(AffectionPrefix + selected.captureId, 0);
+        int attack = ARBookCompanionBattleRoster.GetAttack(selected.captureId);
+        int heal = ARBookCompanionBattleRoster.GetHealAmount(selected.captureId);
         if (detailText != null)
         {
             detailText.text =
                 $"{selected.displayName}\n\n" +
                 $"\u5fc3\u60c5\uff1a{mood}\n" +
                 $"\u597d\u611f\uff1a{affection}\n" +
+                $"\u653b\u51fb\uff1a{attack}\n" +
+                (heal > 0 ? $"\u56de\u590d\uff1a{heal}\n" : string.Empty) +
                 $"\u72b6\u6001\uff1a{(carried ? "\u5df2\u643a\u5e26" : "\u672a\u643a\u5e26")}";
         }
 
@@ -373,6 +411,28 @@ public class ARBookCompanionStaticSlotOverlay : MonoBehaviour
         if (carryButtonText != null)
         {
             carryButtonText.text = carried ? "\u53d6\u6d88\u643a\u5e26" : "\u643a\u5e26";
+        }
+
+        RefreshInteractButton(true);
+    }
+
+    private void RefreshInteractButton(bool hasSelection)
+    {
+        int remaining = controller != null
+            ? controller.GetCompanionInteractionsRemainingForUi()
+            : 0;
+        int maxInteractions = controller != null
+            ? controller.maxCompanionInteractionsPerGame
+            : 0;
+
+        if (interactButtonText != null)
+        {
+            interactButtonText.text = $"\u4e92\u52a8\uff08{remaining}/{maxInteractions}\uff09";
+        }
+
+        if (interactButton != null)
+        {
+            interactButton.interactable = hasSelection && remaining > 0;
         }
     }
 

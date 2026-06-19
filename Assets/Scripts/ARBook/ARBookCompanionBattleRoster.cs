@@ -15,31 +15,33 @@ public static class ARBookCompanionBattleRoster
     public const int BattleActionMoodCost = 8;
     public const int BattleFinishMoodCost = 10;
     public const int InteractionMoodGain = 12;
+    public const int ManaphyHealAmount = 80;
     public const float MoodRecoverPerHour = 6f;
 
     public static readonly Dictionary<string, int> AttackById =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            { "Bulbasaur", 18 },
-            { "Talonflame", 28 },
-            { "Axew", 24 },
-            { "Pikachu", 26 },
-            { "Meowth", 17 },
-            { "Infernape", 30 },
-            { "Squirtle", 19 },
-            { "Jirachi", 22 },
-            { "Sneasler", 27 },
-            { "Zorua", 21 },
-            { "Zekrom", 42 },
-            { "Zygarde10", 34 },
-            { "Toxtricity", 29 },
-            { "Scizor", 31 },
-            { "Mismagius", 25 },
-            { "Mew", 32 },
-            { "Manaphy", 16 },
-            { "ElectrodeHisuian", 23 },
-            { "Dragapult", 36 },
-            { "Celebi", 24 }
+            { "Bulbasaur", 32 },
+            { "Talonflame", 48 },
+            { "Axew", 42 },
+            { "Pikachu", 44 },
+            { "Meowth", 30 },
+            { "Infernape", 52 },
+            { "Squirtle", 34 },
+            { "Jirachi", 46 },
+            { "Sneasler", 50 },
+            { "Zorua", 38 },
+            { "Zekrom", 68 },
+            { "Zygarde", 62 },
+            { "Zygarde10", 62 },
+            { "Toxtricity", 50 },
+            { "Scizor", 54 },
+            { "Mismagius", 45 },
+            { "Mew", 58 },
+            { "Manaphy", 28 },
+            { "ElectrodeHisuian", 40 },
+            { "Dragapult", 64 },
+            { "Celebi", 42 }
         };
 
     public static string[] GetParty()
@@ -103,6 +105,11 @@ public static class ARBookCompanionBattleRoster
         return SameId(captureId, "Manaphy");
     }
 
+    public static int GetHealAmount(string captureId)
+    {
+        return IsHealer(captureId) ? ManaphyHealAmount : 0;
+    }
+
     public static int GetMood(string captureId)
     {
         if (string.IsNullOrWhiteSpace(captureId))
@@ -154,13 +161,16 @@ public static class ARBookCompanionBattleRoster
     {
         if (string.IsNullOrWhiteSpace(captureId))
         {
-            return $"{slotName} 未携带";
+            return $"{slotName} \u672a\u643a\u5e26";
         }
 
         int mood = GetMood(captureId);
-        int attack = GetAttack(captureId);
-        string action = IsHealer(captureId) ? "回复" : "攻击";
-        return $"{slotName} {captureId} {action}  攻{attack}  心情{mood}";
+        if (IsHealer(captureId))
+        {
+            return $"{slotName} {captureId} \u56de\u590d {GetHealAmount(captureId)}  \u5fc3\u60c5{mood}";
+        }
+
+        return $"{slotName} {captureId} \u653b\u51fb {GetAttack(captureId)}  \u5fc3\u60c5{mood}";
     }
 
     public static bool TryUseAction(
@@ -172,29 +182,29 @@ public static class ARBookCompanionBattleRoster
         message = string.Empty;
         if (string.IsNullOrWhiteSpace(captureId))
         {
-            message = "这个携带位还没有宝可梦。";
+            message = "\u8fd9\u4e2a\u643a\u5e26\u4f4d\u8fd8\u6ca1\u6709\u5b9d\u53ef\u68a6\u3002";
             return false;
         }
 
         int mood = GetMood(captureId);
         if (mood < MinMoodForBattle)
         {
-            message = $"{captureId} 心情太低，不愿意出战。";
+            message = $"{captureId} \u5fc3\u60c5\u592a\u4f4e\uff0c\u4e0d\u613f\u610f\u51fa\u6218\u3002";
             return false;
         }
 
         SpendMood(captureId, BattleActionMoodCost);
         if (IsHealer(captureId))
         {
-            int heal = Mathf.Max(20, GetAttack(captureId) + 12);
+            int heal = GetHealAmount(captureId);
             player?.Heal(heal);
-            message = $"{captureId} 为主角回复 {heal} 点生命。";
+            message = $"{captureId} \u4e3a\u4e3b\u89d2\u56de\u590d {heal} \u70b9\u751f\u547d\u3002";
             return true;
         }
 
         int damage = GetAttack(captureId);
         enemy?.TakeDamage(damage);
-        message = $"{captureId} 助战攻击，造成 {damage} 点伤害。";
+        message = $"{captureId} \u52a9\u6218\u653b\u51fb\uff0c\u9020\u6210 {damage} \u70b9\u4f24\u5bb3\u3002";
         return true;
     }
 
