@@ -842,6 +842,8 @@ public class ARBookGameShellController : MonoBehaviour
             companionReturnGameButton;
         companionReturnHomeButton =
             FindButton(hudRoot, "CompanionReturnHomeButton") ??
+            FindButton(companionRoot, "CompanionReturnHomeButton") ??
+            FindButton(generatedRoot, "CompanionReturnHomeButton") ??
             companionReturnHomeButton;
         startButtonText = startButton != null
             ? startButton.GetComponentInChildren<TMP_Text>(true)
@@ -1165,7 +1167,7 @@ public class ARBookGameShellController : MonoBehaviour
         companionCameraInteractButton = CreateButton("CompanionInteractButton", root, "互动", 24);
         SetButtonRect(companionCameraInteractButton, new Vector2(0f, 58f), new Vector2(220f, 76f));
         companionReturnHomeButton = CreateButton("CompanionReturnHomeButton", root, "返回首页", 22);
-        SetButtonRect(companionReturnHomeButton, new Vector2(250f, 58f), new Vector2(190f, 68f));
+        SetBottomRightButtonRect(companionReturnHomeButton, new Vector2(190f, 68f), new Vector2(34f, 34f));
 
         RectTransform hint = CreatePanel(
             "CameraHint",
@@ -3864,6 +3866,29 @@ public class ARBookGameShellController : MonoBehaviour
         SetAnchors(rect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
         rect.sizeDelta = size;
         rect.anchoredPosition = anchoredPosition;
+    }
+
+    private static void SetBottomRightButtonRect(
+        Button button,
+        Vector2 size,
+        Vector2 margin)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        RectTransform rect = button.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(1f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(1f, 0f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = new Vector2(-margin.x, margin.y);
     }
 
     private static void SetAnchors(RectTransform rect, Vector2 min, Vector2 max)

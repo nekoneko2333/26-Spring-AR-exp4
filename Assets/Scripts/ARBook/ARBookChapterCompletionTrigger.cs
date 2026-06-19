@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 public class ARBookChapterCompletionTrigger : MonoBehaviour
 {
@@ -29,6 +30,7 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
     public DialogueManager dialogueManager;
     public GameObject transitionEffectRoot;
     public ParticleSystem transitionEffect;
+    public UnityEvent onChapterCompleted;
 
     [Header("Options")]
     public bool onlyCompleteOnce = true;
@@ -99,6 +101,7 @@ public class ARBookChapterCompletionTrigger : MonoBehaviour
         chapterProgress.CompleteChapterWithMemoryFragment(
             chapterId,
             GetCompleteDialogue());
+        onChapterCompleted?.Invoke();
 
         if (questTracker != null && questTracker.chapterId == chapterId)
         {

@@ -13,12 +13,14 @@ public static class ARBookAudioAutoBinder
     [MenuItem("ARBook/Tools/Auto Bind Audio Cues")]
     public static void AutoBindAudioCues()
     {
-        AudioClip uiClick = LoadClip("默认UI点击音效");
-        AudioClip challengeSuccess = LoadClip("挑战成功音效");
-        AudioClip challengeFailure = LoadClip("挑战错误音效");
-        AudioClip chapterEnd = LoadClip("章节结束音效");
-        AudioClip defaultBgm = LoadClip("常驻bgm");
-        AudioClip battleBgm = LoadClip("战斗bgm");
+        AudioClip uiClick = LoadClip("\u9ed8\u8ba4UI\u70b9\u51fb\u97f3\u6548");
+        AudioClip challengeSuccess = LoadClip("\u6311\u6218\u6210\u529f\u97f3\u6548");
+        AudioClip challengeFailure = LoadClip("\u6311\u6218\u9519\u8bef\u97f3\u6548");
+        AudioClip chapterEnd = LoadClip("\u7ae0\u8282\u7ed3\u675f\u97f3\u6548");
+        AudioClip attack = LoadClip("\u653b\u51fb\u97f3\u6548");
+        AudioClip hit = LoadClip("\u53d7\u51fb\u97f3\u6548");
+        AudioClip defaultBgm = LoadClip("\u5e38\u9a7bbgm");
+        AudioClip battleBgm = LoadClip("\u6218\u6597bgm");
 
         GameObject audioRoot = FindOrCreateAudioRoot();
         ARBookAudioCue uiClickCue =
@@ -41,6 +43,7 @@ public static class ARBookAudioAutoBinder
         changed += BindObjectiveEvents(chapterEndCue);
         changed += BindMovementEvents(challengeSuccessCue, challengeFailureCue);
         changed += BindActivationEvents(challengeSuccessCue, chapterEndCue);
+        changed += BindBattleCombatants(attack, hit, chapterEnd, challengeFailure);
         changed += BindBattleBgm(defaultBgmCue, battleBgmCue);
         changed += BindPresentationBgm(defaultBgmCue, battleBgmCue);
 
@@ -143,6 +146,16 @@ public static class ARBookAudioAutoBinder
             EditorUtility.SetDirty(finale);
         }
 
+        ARBookChapterCompletionTrigger[] triggers =
+            Object.FindObjectsOfType<ARBookChapterCompletionTrigger>(true);
+        for (int i = 0; i < triggers.Length; i++)
+        {
+            ARBookChapterCompletionTrigger trigger = triggers[i];
+            Undo.RecordObject(trigger, "Bind chapter completion audio");
+            changed += AddPersistentListener(trigger.onChapterCompleted, chapterEndCue, nameof(ARBookAudioCue.PlayOneShot));
+            EditorUtility.SetDirty(trigger);
+        }
+
         return changed;
     }
 
@@ -186,6 +199,31 @@ public static class ARBookAudioAutoBinder
 
             changed += AddPersistentListener(sequence.onSequenceCompleted, completedCue, nameof(ARBookAudioCue.PlayOneShot));
             EditorUtility.SetDirty(sequence);
+        }
+
+        return changed;
+    }
+
+    private static int BindBattleCombatants(
+        AudioClip attack,
+        AudioClip hit,
+        AudioClip victory,
+        AudioClip defeat)
+    {
+        int changed = 0;
+        ARBookBattleCombatant[] combatants =
+            Object.FindObjectsOfType<ARBookBattleCombatant>(true);
+        for (int i = 0; i < combatants.Length; i++)
+        {
+            ARBookBattleCombatant combatant = combatants[i];
+            Undo.RecordObject(combatant, "Bind battle combatant audio");
+            changed += SetClip(combatant.attackClip, attack, value => combatant.attackClip = value);
+            changed += SetClip(combatant.hitClip, hit, value => combatant.hitClip = value);
+            changed += SetClip(combatant.defeatClip, defeat, value => combatant.defeatClip = value);
+            changed += SetClip(combatant.victoryClip, victory, value => combatant.victoryClip = value);
+            changed += SetClip(combatant.captureSuccessClip, victory, value => combatant.captureSuccessClip = value);
+            changed += EnsureAudioSource(combatant.gameObject, combatant.audioSource, value => combatant.audioSource = value);
+            EditorUtility.SetDirty(combatant);
         }
 
         return changed;

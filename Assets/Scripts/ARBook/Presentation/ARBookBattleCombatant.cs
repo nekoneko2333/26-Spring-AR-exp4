@@ -11,6 +11,12 @@ public class ARBookBattleCombatant : MonoBehaviour
     public ARBookPresentationActor actor;
     public Slider hpSlider;
     public TMP_Text hpText;
+    public AudioSource audioSource;
+    public AudioClip attackClip;
+    public AudioClip hitClip;
+    public AudioClip defeatClip;
+    public AudioClip victoryClip;
+    public AudioClip captureSuccessClip;
     public UnityEvent onDefeated;
 
     public int CurrentHP { get; private set; }
@@ -35,6 +41,7 @@ public class ARBookBattleCombatant : MonoBehaviour
 
     public void PlayAttack()
     {
+        PlayClip(attackClip);
         actor?.PlayAttack();
     }
 
@@ -50,11 +57,13 @@ public class ARBookBattleCombatant : MonoBehaviour
 
         if (IsDefeated)
         {
+            PlayClip(defeatClip);
             actor?.PlayDefeat();
             onDefeated?.Invoke();
         }
         else
         {
+            PlayClip(hitClip);
             actor?.PlayHit();
         }
     }
@@ -73,12 +82,35 @@ public class ARBookBattleCombatant : MonoBehaviour
 
     public void PlayVictory()
     {
+        PlayClip(victoryClip);
         actor?.PlayVictory();
     }
 
     public void PlayCaptureSuccess()
     {
+        PlayClip(captureSuccessClip);
         actor?.PlayCaptureSuccess();
+    }
+
+    private void PlayClip(AudioClip clip)
+    {
+        if (clip == null)
+        {
+            return;
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.spatialBlend = 0f;
+        audioSource.PlayOneShot(clip);
     }
 
     private void RefreshUI()
