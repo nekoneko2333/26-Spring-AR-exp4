@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -6,161 +6,128 @@ using UnityEngine;
 
 public static class ARBookCompanionPortraitBinder
 {
-    private const string TextureFolder =
-        "Assets/Editor/Vuforia/ImageTargetTextures/mcfAR";
+    private const string SpriteFolder = "Assets/UI/pokemonpic";
 
-    [MenuItem("ARBook/Tools/Bind Companion Portraits From Vuforia Textures")]
+    [MenuItem("ARBook/Tools/Bind Companion Portraits From CaptureID PNGs")]
     public static void BindCompanionPortraits()
     {
         ARBookGameShellController controller =
             UnityEngine.Object.FindObjectOfType<ARBookGameShellController>(true);
         if (controller == null)
         {
-            Debug.LogWarning("没有找到 ARBookGameShellController，无法绑定陪伴图片。");
+            Debug.LogWarning("ARBookGameShellController was not found. Portrait binding skipped.");
             return;
         }
 
         if (controller.companions == null || controller.companions.Length == 0)
         {
-            Debug.LogWarning(
-                "ARBookGameShellController companions 为空。为避免覆盖手动绑定的图片和模型，本工具不会自动重置目录。");
+            Debug.LogWarning("ARBookGameShellController.companions is empty. Portrait binding skipped.");
             return;
         }
 
-        Dictionary<string, Texture2D> textures = LoadTextures();
-        Debug.Log($"陪伴图片绑定：从 {TextureFolder} 找到 {textures.Count} 张可用图片。");
+        Dictionary<string, Sprite> sprites = LoadSprites();
+        Debug.Log($"Pokemon portrait binding: found {sprites.Count} CaptureID PNG sprites in {SpriteFolder}.");
 
         int changed = 0;
         int alreadyBound = 0;
         int missing = 0;
-        Undo.RecordObject(controller, "Bind Companion Portraits");
+        Undo.RecordObject(controller, "Bind Pokemon Portraits");
 
         for (int i = 0; i < controller.companions.Length; i++)
         {
-            ARBookGameShellController.CompanionDefinition companion =
-                controller.companions[i];
-            if (companion == null)
+            ARBookGameShellController.CompanionDefinition companion = controller.companions[i];
+            if (companion == null || string.IsNullOrWhiteSpace(companion.captureId))
             {
                 continue;
             }
 
-            Texture2D texture = FindTextureFor(companion, textures);
-            if (texture == null)
+            if (!sprites.TryGetValue(companion.captureId, out Sprite sprite))
             {
                 missing++;
-                Debug.LogWarning(
-                    $"陪伴图片未匹配：captureId={companion.captureId}, imageTargetName={companion.imageTargetName}, displayName={companion.displayName}");
+                Debug.LogWarning($"Pokemon portrait missing: captureId={companion.captureId}, expected {SpriteFolder}/{companion.captureId}.png");
                 continue;
             }
 
-            if (companion.portraitTexture == texture)
+            if (companion.portrait == sprite)
             {
                 alreadyBound++;
                 continue;
             }
 
-            companion.portraitTexture = texture;
-            companion.portrait = null;
+            companion.portrait = sprite;
             changed++;
-            Debug.Log($"陪伴图片已绑定：{companion.captureId} -> {texture.name}");
+            Debug.Log($"Pokemon portrait bound: {companion.captureId} -> {sprite.name}");
         }
 
         EditorUtility.SetDirty(controller);
         EditorSceneManager.MarkSceneDirty(controller.gameObject.scene);
-        Debug.Log($"陪伴模式图片绑定完成：更新 {changed} 个，已绑定 {alreadyBound} 个，未匹配 {missing} 个。");
+        Debug.Log($"Pokemon portrait binding complete. changed={changed}, alreadyBound={alreadyBound}, missing={missing}");
     }
 
-    private static Dictionary<string, Texture2D> LoadTextures()
+    private static Dictionary<string, Sprite> LoadSprites()
     {
-        Dictionary<string, Texture2D> textures =
-            new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
-        string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { TextureFolder });
+        Dictionary<string, Sprite> sprites =
+            new Dictionary<string, Sprite>(StringComparer.Ordinal);
+        string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { SpriteFolder });
         for (int i = 0; i < guids.Length; i++)
         {
             string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (texture == null)
+            if (!string.Equals(
+                System.IO.Path.GetExtension(path),
+                ".png",
+                StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            AddTexture(textures, texture.name, texture);
-            AddTexture(textures, System.IO.Path.GetFileNameWithoutExtension(path), texture);
-        }
-
-        return textures;
-    }
-
-    private static void AddTexture(
-        Dictionary<string, Texture2D> textures,
-        string rawKey,
-        Texture2D texture)
-    {
-        string key = Normalize(rawKey);
-        if (!string.IsNullOrWhiteSpace(key) && !textures.ContainsKey(key))
-        {
-            textures.Add(key, texture);
-        }
-    }
-
-    private static Texture2D FindTextureFor(
-        ARBookGameShellController.CompanionDefinition companion,
-        Dictionary<string, Texture2D> textures)
-    {
-        string[] keys =
-        {
-            companion.imageTargetName,
-            companion.captureId,
-            companion.displayName,
-            ResolveDefaultImageTargetName(companion.captureId)
-        };
-
-        for (int i = 0; i < keys.Length; i++)
-        {
-            string key = Normalize(keys[i]);
-            if (!string.IsNullOrWhiteSpace(key) &&
-                textures.TryGetValue(key, out Texture2D texture))
+            EnsureSpriteImport(path);
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite == null)
             {
-                return texture;
+                Debug.LogWarning($"Could not load PNG as Sprite: {path}");
+                continue;
+            }
+
+            string captureId = System.IO.Path.GetFileNameWithoutExtension(path);
+            if (!string.IsNullOrWhiteSpace(captureId) && !sprites.ContainsKey(captureId))
+            {
+                sprites.Add(captureId, sprite);
             }
         }
 
-        return null;
+        return sprites;
     }
 
-    private static string ResolveDefaultImageTargetName(string captureId)
+    private static void EnsureSpriteImport(string path)
     {
-        if (string.Equals(captureId, "ElectrodeHisuian", StringComparison.OrdinalIgnoreCase))
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null)
         {
-            return "electrode";
+            return;
         }
 
-        if (string.Equals(captureId, "Talonflame", StringComparison.OrdinalIgnoreCase))
+        bool changed = false;
+        if (importer.textureType != TextureImporterType.Sprite)
         {
-            return "GalarianZapdos";
+            importer.textureType = TextureImporterType.Sprite;
+            changed = true;
         }
 
-        return captureId;
-    }
-
-    private static string Normalize(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
+        if (importer.spriteImportMode != SpriteImportMode.Single)
         {
-            return value;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            changed = true;
         }
 
-        string normalized = value.Trim();
-        const string scaledSuffix = "_scaled";
-        if (normalized.EndsWith(scaledSuffix, StringComparison.OrdinalIgnoreCase))
+        if (!importer.alphaIsTransparency)
         {
-            normalized = normalized.Substring(0, normalized.Length - scaledSuffix.Length);
+            importer.alphaIsTransparency = true;
+            changed = true;
         }
 
-        return normalized
-            .Replace(" ", string.Empty)
-            .Replace("_", string.Empty)
-            .Replace("-", string.Empty)
-            .ToLowerInvariant();
+        if (changed)
+        {
+            importer.SaveAndReimport();
+        }
     }
 }
